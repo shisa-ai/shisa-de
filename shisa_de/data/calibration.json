@@ -1,0 +1,20 @@
+{
+  "readout_version": "de1-letter-slots-v1",
+  "model": "shisa-ai/shisa-de-1",
+  "serving_shape": "merged-bf16-tp2",
+  "temperatures": {
+    "noul": 1.69,
+    "choice": 1.9
+  },
+  "fitted_on": "dev splits of the committed suites, NLL grid 0.5-32.0 step 0.01; score distributions use the choice fit",
+  "test_ece": {
+    "split": "test",
+    "n": 7446,
+    "noul_before": 0.054,
+    "noul_after": 0.042,
+    "choice_before": 0.138,
+    "choice_after": 0.046
+  },
+  "source": "research-jev-universal-classifiers evals/results/vllm-scoring-89b3a38d35ac0198/calibration.json, fitted on the merged bf16 serving shape",
+  "note": "Fitted on a local merged-weights server. A different serving shape moves the logprobs slightly, so re-fit before relying on these numbers for a gate."
+}
