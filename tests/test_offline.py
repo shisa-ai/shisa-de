@@ -51,6 +51,78 @@ def top_logprobs(entries: dict[str, float], prompt_tokens: int = 12) -> dict:
     }
 
 
+# -- hosted configuration and health ------------------------------------------
+
+@pytest.mark.parametrize("constructor", [DecisionModel, DecisionModel.from_pretrained])
+@pytest.mark.parametrize("key_source", ["platform", "de", "explicit"])
+def test_hosted_defaults_and_api_key_precedence(monkeypatch, constructor, key_source):
+    monkeypatch.delenv("SHISA_DE_ENDPOINT", raising=False)
+    monkeypatch.delenv("SHISA_DE_API_KEY", raising=False)
+    monkeypatch.setenv("SHISA_API_KEY", "platform-key")
+    kwargs = {}
+    if key_source in {"de", "explicit"}:
+        monkeypatch.setenv("SHISA_DE_API_KEY", "de-key")
+    if key_source == "explicit":
+        kwargs["api_key"] = "explicit-key"
+    calls = []
+
+    def handler(request):
+        calls.append(request)
+        assert str(request.url) == "https://api.shisa.ai/openai/v1/completions"
+        assert request.headers["Authorization"] == f"Bearer {key_source}-key"
+        assert json.loads(request.content)["model"] == "shisa-ai/shisa-de-1"
+        return httpx.Response(200, json=top_logprobs({"A": -0.1, "B": -3.0}))
+
+    with constructor(transport=httpx.MockTransport(handler), **kwargs) as model:
+        assert model.readout._tokenizer is None
+        assert model.readout.tokenizer_source == "shisa-ai/shisa-de-1"
+        model.readout._tokenizer = StubTokenizer()
+        result = model.classify("Win a prize!", {"intent": ["spam", "ham"]})
+        assert result["intent"] == "spam"
+    assert len(calls) == 1
+
+
+@pytest.mark.parametrize("explicit", [False, True])
+def test_endpoint_overrides_preserve_custom_model(monkeypatch, explicit):
+    monkeypatch.setenv("SHISA_DE_ENDPOINT", "http://env.local/")
+    kwargs = {"base_url": "http://explicit.local/"} if explicit else {}
+    expected = "http://explicit.local" if explicit else "http://env.local"
+
+    def handler(request):
+        assert str(request.url) == expected + "/v1/completions"
+        assert json.loads(request.content)["model"] == "custom-model"
+        return httpx.Response(200, json=top_logprobs({"A": -0.1, "B": -3.0}))
+
+    with DecisionModel(model="custom-model", transport=httpx.MockTransport(handler), **kwargs) as model:
+        assert model.base_url == expected
+        model.readout._tokenizer = StubTokenizer()
+        assert model.classify("state", {"intent": ["a", "b"]})["intent"] == "a"
+
+
+@pytest.mark.parametrize("status,listed,boundary_ok", [
+    (200, True, True),
+    (200, False, True),
+    (401, False, True),
+    (503, False, True),
+    (200, True, False),
+])
+def test_health_requires_model_access_and_boundary(monkeypatch, status, listed, boundary_ok):
+    def handler(request):
+        assert request.url.path == "/v1/models"
+        return httpx.Response(status, json={"data": [{"id": "test-model"}] if listed else []})
+
+    with DecisionModel(base_url="http://test.local", model="test-model",
+                       transport=httpx.MockTransport(handler)) as model:
+        model.readout._tokenizer = StubTokenizer()
+        if not boundary_ok:
+            def fail_boundary(*args):
+                raise ReadoutError("answer boundary moves")
+            monkeypatch.setattr(model.readout, "check_boundary", fail_boundary)
+        report = model.health()
+    assert report["ok"] is (status == 200 and listed and boundary_ok)
+    assert (report["boundary_check"] == "passed") is boundary_ok
+
+
 # -- questions ---------------------------------------------------------------
 
 def test_wire_shapes_match_the_system_one_api():

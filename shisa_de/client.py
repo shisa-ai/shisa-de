@@ -319,7 +319,7 @@ class DecisionModel:
             self.readout.check_boundary(prompt, slots)
             report["boundary_check"] = "passed"
             report["slots"] = {slot.letter: slot.token_id for slot in slots}
-            report["ok"] = True
+            report["ok"] = report.get("model_listed", False)
         except (ReadoutError, QuestionError) as exc:
             report["boundary_check"] = f"failed: {exc}"
         return report

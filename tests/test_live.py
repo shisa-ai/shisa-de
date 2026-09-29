@@ -34,6 +34,8 @@ def model():
 
 def test_health_reports_the_endpoint_and_passes_the_boundary_check(model):
     report = model.health()
+    assert report["models_status"] == 200, report
+    assert report["model_listed"] is True, report
     assert report["boundary_check"] == "passed", report
     assert report["ok"] is True
 

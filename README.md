@@ -6,7 +6,7 @@ answers back, with the distribution and the request cost attached.
 ```python
 from shisa_de import DecisionModel
 
-de = DecisionModel.from_pretrained("shisa-ai/shisa-de-1")
+de = DecisionModel()  # uses SHISA_API_KEY and the hosted DE-1 endpoint
 
 de.classify(
     {"sms": "WINNER!! You have won a $1000 gift card. Claim it now: bit.ly/xyz",
@@ -17,8 +17,8 @@ de.classify(
 ```
 
 DE-1 runs on a GPU server: this package holds an HTTP client and a tokenizer,
-and downloads no weights. Nothing is fetched at import time except the
-tokenizer.
+and downloads no weights. Nothing is fetched at import time. The tokenizer is
+loaded lazily when first needed and may require a download from Hugging Face.
 
 ## Install
 
@@ -26,12 +26,23 @@ tokenizer.
 pip install -e .        # from a checkout; not published to PyPI yet
 ```
 
-Set the endpoint and key for the hosted service:
+For the hosted service, set only your Shisa API key:
 
 ```bash
-export SHISA_DE_ENDPOINT=https://api.shisa.ai/openai   # this is the default
-export SHISA_API_KEY=...                               # or SHISA_DE_API_KEY
+export SHISA_API_KEY=...
+shisa-de doctor
+shisa-de ask --state 'WINNER! Claim your free prize now!' --labels spam,ham
 ```
+
+`DecisionModel()` and the CLI default to `shisa-ai/shisa-de-1` at
+`https://api.shisa.ai/openai`. No endpoint or model argument is required.
+`doctor` checks access to the model list, that DE-1 is listed, and the local
+tokenizer's answer boundary; `ask` verifies an actual completion request.
+
+Explicit `api_key=` takes precedence over `SHISA_DE_API_KEY`, then
+`SHISA_API_KEY`. Explicit `base_url=` takes precedence over
+`SHISA_DE_ENDPOINT`, then the hosted default. Leave the DE-specific environment
+variables unset to use just `SHISA_API_KEY` with the hosted defaults.
 
 ## Classify
 
