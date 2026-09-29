@@ -10,6 +10,8 @@ from __future__ import annotations
 
 import json
 import os
+import struct
+import zlib
 
 import pytest
 
@@ -90,6 +92,31 @@ def test_the_model_card_example_still_renders_the_same_prompt(model):
     assert read.answer() == "A"
     assert read.probabilities["A"] > 0.99
     assert read.requests == 1
+
+
+@pytest.mark.parametrize("color,rgb", [("red", b"\xff\x00\x00"), ("blue", b"\x00\x00\xff")])
+def test_image_classification_reads_pixels_not_filenames(model, tmp_path, color, rgb):
+    def chunk(kind, data):
+        return (struct.pack("!I", len(data)) + kind + data
+                + struct.pack("!I", zlib.crc32(kind + data) & 0xffffffff))
+
+    width = height = 32
+    png = (b"\x89PNG\r\n\x1a\n"
+           + chunk(b"IHDR", struct.pack("!2I5B", width, height, 8, 2, 0, 0, 0))
+           + chunk(b"IDAT", zlib.compress((b"\x00" + rgb * width) * height))
+           + chunk(b"IEND", b""))
+    path = tmp_path / "image.png"
+    path.write_bytes(png)
+    result = model.classify(
+        {}, {"color": {"labels": ["red", "blue"], "prompt": "What is the dominant color in this image?"}},
+        image=path,
+    )
+    assert result["color"] == color
+    assert result.answers["color"].calibrated is False
+    assert result.meta["input_type"] == "image"
+    assert result.usage["requests"] == 1
+    assert result.usage["input_tokens"] > 0
+    assert sum(result.answers["color"].probabilities.values()) == pytest.approx(1)
 
 
 def test_answers_are_json_serializable(model):

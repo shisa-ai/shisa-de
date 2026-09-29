@@ -12,7 +12,7 @@ import json
 import shlex
 from typing import Any
 
-from .client import DEFAULT_ENDPOINT, DEFAULT_MODEL, DecisionModel
+from .client import DEFAULT_ENDPOINT, DEFAULT_MODEL, DecisionModel, _api_key_from_env
 from .readout import LETTERS, READOUT_VERSION
 from .questions import Choice
 
@@ -58,6 +58,8 @@ def build_parser() -> argparse.ArgumentParser:
     ask = sub.add_parser("ask", help="classify a state against a label set")
     _common(ask)
     ask.add_argument("--state", default=None, help="JSON state, or plain text; a built-in example by default")
+    ask.add_argument("--image", help="local image path, HTTP(S) URL, or image data URL")
+    ask.add_argument("--image-top-logprobs", type=int, default=20, help="image logprob limit (must be allowed by the server)")
     ask.add_argument("--labels", default=None, help="comma separated labels")
     ask.add_argument("--prompt", default=None, help="the question to ask (default: derived from the head name)")
     ask.add_argument("--confidence", action="store_true", help="return the label with its confidence")
@@ -74,7 +76,10 @@ def build_parser() -> argparse.ArgumentParser:
 
 def main(argv: list[str] | None = None) -> int:
     args = build_parser().parse_args(argv)
-    model = DecisionModel(base_url=args.base_url, model=args.model, tokenizer=args.tokenizer, timeout=args.timeout)
+    model = DecisionModel(
+        base_url=args.base_url, model=args.model, tokenizer=args.tokenizer, timeout=args.timeout,
+        image_top_logprobs=getattr(args, "image_top_logprobs", 20),
+    )
     with model:
         if args.command == "doctor":
             report = model.health()
@@ -94,9 +99,13 @@ def main(argv: list[str] | None = None) -> int:
             return 0 if report["ok"] else 1
 
         if args.command == "ask":
+            labels = _labels_from(args.labels)
+            if args.prompt:
+                labels = {head: {"labels": values, "prompt": args.prompt} for head, values in labels.items()}
             result = model.classify(
-                _state_from(args.state),
-                _labels_from(args.labels),
+                {} if args.image and args.state is None else _state_from(args.state),
+                labels,
+                image=args.image,
                 include_confidence=args.confidence,
                 include_probabilities=args.probabilities,
             )
@@ -154,6 +163,8 @@ def _explain(model: DecisionModel, args: argparse.Namespace) -> int:
     body = {"model": model.model, "prompt": prompt, "max_tokens": 1, "temperature": 0, "logprobs": 20}
     print(f"curl -s {shlex.quote(model.base_url + '/v1/completions')} \\")
     print("  -H 'Content-Type: application/json' \\")
+    if _api_key_from_env():
+        print('  -H "Authorization: Bearer ${SHISA_DE_API_KEY:-$SHISA_API_KEY}" \\')
     print(f"  -d {shlex.quote(json.dumps(body))}")
     print()
     print(f"readout {READOUT_VERSION}; {len(LETTERS)} letters available, {len(options)} used")

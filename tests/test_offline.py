@@ -7,6 +7,7 @@ covers the real endpoint and is opt-in.
 
 from __future__ import annotations
 
+import base64
 import json
 import math
 
@@ -16,8 +17,9 @@ import pytest
 from shisa_de import Choice, DecisionModel, Noul, Readout, ReadoutError, Score, softmax
 from shisa_de.calibration import confidence, temper_binary, temper_distribution
 from shisa_de.client import Decision, _MultiLabel, _question_from_head
+from shisa_de.images import ImageError, prepare_image, validate_image_url
 from shisa_de.questions import MAX_OPTIONS, QuestionError, render_option
-from shisa_de.readout import LetterRead
+from shisa_de.readout import ANSWER_PREFIX, DIRECT_SYSTEM, LetterRead
 
 
 class StubTokenizer:
@@ -83,9 +85,10 @@ def test_hosted_defaults_and_api_key_precedence(monkeypatch, constructor, key_so
 
 
 @pytest.mark.parametrize("explicit", [False, True])
-def test_endpoint_overrides_preserve_custom_model(monkeypatch, explicit):
-    monkeypatch.setenv("SHISA_DE_ENDPOINT", "http://env.local/")
-    kwargs = {"base_url": "http://explicit.local/"} if explicit else {}
+@pytest.mark.parametrize("suffix", ["/", "/v1", "/v1/"])
+def test_endpoint_overrides_preserve_custom_model(monkeypatch, explicit, suffix):
+    monkeypatch.setenv("SHISA_DE_ENDPOINT", "http://env.local" + suffix)
+    kwargs = {"base_url": "http://explicit.local" + suffix} if explicit else {}
     expected = "http://explicit.local" if explicit else "http://env.local"
 
     def handler(request):
@@ -97,6 +100,28 @@ def test_endpoint_overrides_preserve_custom_model(monkeypatch, explicit):
         assert model.base_url == expected
         model.readout._tokenizer = StubTokenizer()
         assert model.classify("state", {"intent": ["a", "b"]})["intent"] == "a"
+
+
+def test_local_endpoint_can_disable_environment_authentication(monkeypatch):
+    monkeypatch.setenv("SHISA_API_KEY", "hosted-key")
+    monkeypatch.setenv("SHISA_DE_API_KEY", "de-key")
+    calls = []
+
+    def handler(request):
+        calls.append(request)
+        assert "Authorization" not in request.headers
+        assert str(request.url) == "http://localhost:8021/v1/completions"
+        assert json.loads(request.content)["model"] == "local-alias"
+        return httpx.Response(200, json=top_logprobs({"A": -0.1, "B": -3.0}))
+
+    with DecisionModel.from_endpoint(
+        "http://localhost:8021/v1", model="local-alias", api_key="",
+        tokenizer="shisa-ai/shisa-de-1", transport=httpx.MockTransport(handler),
+    ) as model:
+        assert model.readout.tokenizer_source == "shisa-ai/shisa-de-1"
+        model.readout._tokenizer = StubTokenizer()
+        assert model.classify("state", {"intent": ["a", "b"]})["intent"] == "a"
+    assert len(calls) == 1
 
 
 @pytest.mark.parametrize("status,listed,boundary_ok", [
@@ -121,6 +146,87 @@ def test_health_requires_model_access_and_boundary(monkeypatch, status, listed, 
         report = model.health()
     assert report["ok"] is (status == 200 and listed and boundary_ok)
     assert (report["boundary_check"] == "passed") is boundary_ok
+
+
+# -- command line ------------------------------------------------------------
+
+def test_cli_ask_uses_the_supplied_prompt(monkeypatch, capsys):
+    from shisa_de import cli
+
+    def handler(request):
+        prompt = json.loads(request.content)["prompt"]
+        payload = json.loads(prompt.split("<user>", 1)[1].split("<model>")[0])
+        assert payload["criterion"] == "Is this spam?"
+        return httpx.Response(200, json=top_logprobs({"A": -0.1, "B": -3.0}))
+
+    model = DecisionModel(transport=httpx.MockTransport(handler))
+    model.readout._tokenizer = StubTokenizer()
+    monkeypatch.setattr(cli, "DecisionModel", lambda **kwargs: model)
+    assert cli.main(["ask", "--state", "prize", "--labels", "spam,ham",
+                     "--prompt", "Is this spam?"]) == 0
+    assert json.loads(capsys.readouterr().out) == {"intent": "spam"}
+
+
+@pytest.mark.parametrize("authenticated", [False, True])
+def test_cli_explain_curl_uses_environment_references_not_secrets(monkeypatch, capsys, authenticated):
+    from shisa_de import cli
+
+    monkeypatch.delenv("SHISA_API_KEY", raising=False)
+    monkeypatch.delenv("SHISA_DE_API_KEY", raising=False)
+    if authenticated:
+        monkeypatch.setenv("SHISA_API_KEY", "secret-not-for-output")
+    model = DecisionModel(transport=httpx.MockTransport(
+        lambda request: httpx.Response(200, json=top_logprobs({"A": -0.1, "B": -3.0}))
+    ))
+    model.readout._tokenizer = StubTokenizer()
+    monkeypatch.setattr(cli, "DecisionModel", lambda **kwargs: model)
+    assert cli.main(["explain", "--labels", "spam,ham"]) == 0
+    output = capsys.readouterr().out
+    assert "secret-not-for-output" not in output
+    assert ('Authorization: Bearer ${SHISA_DE_API_KEY:-$SHISA_API_KEY}' in output) is authenticated
+
+
+def test_cli_ask_with_an_image_sends_the_prompt_and_prints_no_image_or_key(tmp_path, monkeypatch, capsys):
+    from shisa_de import cli
+
+    payload = b"\x89PNG\r\n\x1a\n" + b"pretend image bytes"
+    path = tmp_path / "cat.png"
+    path.write_bytes(payload)
+    monkeypatch.setenv("SHISA_API_KEY", "secret-not-for-output")
+    calls: list[dict] = []
+    captured: dict = {}
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        assert request.url.path == "/v1/chat/completions"
+        calls.append(json.loads(request.content))
+        return httpx.Response(200, json=chat_response({"A": -0.1, "B": -3.0}))
+
+    def factory(**kwargs):
+        """Build the model the way the CLI does, so the flag wiring is exercised."""
+        captured.update(kwargs)
+        built = DecisionModel(transport=httpx.MockTransport(handler), **kwargs)
+        built.readout._tokenizer = ImageStubTokenizer()
+        return built
+
+    monkeypatch.setattr(cli, "DecisionModel", factory)
+    assert cli.main(["ask", "--base-url", "http://test.local",
+                     "--image", str(path), "--prompt", "Is this spam?",
+                     "--labels", "spam,ham", "--image-top-logprobs", "48"]) == 0
+
+    output = capsys.readouterr().out
+    assert json.loads(output) == {"intent": "spam"}
+    assert "secret-not-for-output" not in output
+    assert "cat.png" not in output
+    assert base64.b64encode(payload).decode() not in output
+
+    # The image really was sent, so the checks above are not vacuous.
+    sent = json.dumps(calls[0])
+    assert base64.b64encode(payload).decode() in sent
+    assert captured["image_top_logprobs"] == 48
+    assert calls[0]["top_logprobs"] == 48
+    question = json.loads(calls[0]["messages"][1]["content"][1]["text"])
+    assert question["criterion"] == "Is this spam?"
+    assert question["evidence"] == {}  # an image call with no --state sends no invented state
 
 
 # -- questions ---------------------------------------------------------------
@@ -253,6 +359,352 @@ def test_http_errors_are_reported_with_the_body():
 def test_softmax_rejects_an_empty_distribution():
     with pytest.raises(ReadoutError):
         softmax({})
+
+
+# -- images ------------------------------------------------------------------
+
+IMAGE_URL = "data:image/png;base64,AAAA"
+ANSWER_TOKEN_ID = "101"
+
+
+class ImageStubTokenizer(StubTokenizer):
+    """A stub where the generation-prompt terminator is one token.
+
+    The image readout confirms the answer boundary from the server's side, so
+    the terminator has to resolve to exactly one token the way it does in the
+    checkpoint's tokenizer.
+    """
+
+    def encode(self, text: str, add_special_tokens: bool = False) -> list[int]:
+        if text == ANSWER_PREFIX:
+            return [int(ANSWER_TOKEN_ID)]
+        return super().encode(text, add_special_tokens=add_special_tokens)
+
+    def decode(self, ids) -> str:
+        if list(ids) == [int(ANSWER_TOKEN_ID)]:
+            return ANSWER_PREFIX
+        return super().decode(ids)
+
+
+def chat_response(
+    entries: dict[str, float],
+    *,
+    sampled: str | None = None,
+    prompt_token: str | None = ANSWER_PREFIX,
+    prompt_token_id: str = ANSWER_TOKEN_ID,
+    prompt_tokens: int = 512,
+) -> dict:
+    """A `/v1/chat/completions` body in the shape the hosted probe returned."""
+    best = sampled if sampled is not None else max(entries, key=entries.get)
+    prompt_logprobs: list = [None]
+    if prompt_token is not None:
+        prompt_logprobs.append({prompt_token_id: {"logprob": -0.02, "decoded_token": prompt_token}})
+    return {
+        "choices": [{
+            "index": 0,
+            "message": {"role": "assistant", "content": best},
+            "logprobs": {"content": [{
+                "token": best,
+                "top_logprobs": [{"token": token, "logprob": value} for token, value in entries.items()],
+            }]},
+            "finish_reason": "length",
+        }],
+        "prompt_logprobs": prompt_logprobs,
+        "usage": {"prompt_tokens": prompt_tokens, "completion_tokens": 1,
+                  "total_tokens": prompt_tokens + 1},
+    }
+
+
+def broken(mutate) -> dict:
+    """A valid chat response with one part damaged."""
+    response = chat_response({"A": -0.1, "B": -3.0})
+    mutate(response)
+    return response
+
+
+def make_image_readout(handler, **kwargs) -> Readout:
+    readout = make_readout(handler, **kwargs)
+    readout._tokenizer = ImageStubTokenizer()
+    return readout
+
+
+def image_question(count: int = 2) -> Choice:
+    return Choice("Is this spam?", {f"label{index}": None for index in range(count)})
+
+
+# -- preparing an image ------------------------------------------------------
+
+@pytest.mark.parametrize("url", [
+    "https://example.com/cat.png",
+    "http://example.com/cat.jpg",
+    "data:image/webp;base64,AAAA",
+])
+def test_urls_pass_through_unchanged(url):
+    assert prepare_image(url) == url
+
+
+def test_a_local_png_becomes_a_base64_data_url(tmp_path):
+    payload = b"\x89PNG\r\n\x1a\n" + b"pretend image bytes"
+    path = tmp_path / "cat.png"
+    path.write_bytes(payload)
+    url = prepare_image(path)
+    assert url.startswith("data:image/png;base64,")
+    assert base64.b64decode(url.split(",", 1)[1]) == payload
+
+
+def test_a_local_file_is_sent_as_what_it_is_not_what_it_is_called(tmp_path):
+    path = tmp_path / "mislabelled.jpg"
+    path.write_bytes(b"\x89PNG\r\n\x1a\n" + b"png bytes")
+    assert prepare_image(path).startswith("data:image/png;base64,")
+
+
+def test_webp_and_jpeg_are_supported(tmp_path):
+    webp = tmp_path / "shot.webp"
+    webp.write_bytes(b"RIFF\x00\x00\x00\x00WEBP" + b"payload")
+    assert prepare_image(webp).startswith("data:image/webp;base64,")
+    jpeg = tmp_path / "shot.jpeg"
+    jpeg.write_bytes(b"\xff\xd8\xff\xe0" + b"payload")
+    assert prepare_image(jpeg).startswith("data:image/jpeg;base64,")
+
+
+def test_a_string_path_is_accepted_the_same_way(tmp_path):
+    path = tmp_path / "cat.png"
+    path.write_bytes(b"\x89PNG\r\n\x1a\n" + b"bytes")
+    assert prepare_image(str(path)) == prepare_image(path)
+
+
+def test_prepare_image_rejects_bad_values_without_a_request(tmp_path):
+    empty = tmp_path / "empty.png"
+    empty.write_bytes(b"")
+    not_an_image = tmp_path / "fake.png"
+    not_an_image.write_bytes(b"this is not an image")
+
+    for value, expected in [
+        ("", "empty"),
+        ("   ", "empty"),
+        ("photo.gif", "extension"),
+        ("photo.bmp", "extension"),
+        ("ftp://example.com/cat.png", "scheme"),
+        ("file:///tmp/cat.png", "scheme"),
+    ]:
+        with pytest.raises(ImageError, match=expected):
+            prepare_image(value)
+    with pytest.raises(ImageError, match="not found"):
+        prepare_image(tmp_path / "missing.png")
+    with pytest.raises(ImageError, match="empty"):
+        prepare_image(empty)
+    with pytest.raises(ImageError, match="not a PNG"):
+        prepare_image(not_an_image)
+    with pytest.raises(ImageError, match="file path or a URL string"):
+        prepare_image(b"bytes")
+
+
+def test_a_local_file_name_is_not_a_url(tmp_path):
+    path = tmp_path / "cat.png"
+    path.write_bytes(b"\x89PNG\r\n\x1a\n" + b"bytes")
+    with pytest.raises(ImageError, match="prepare_image"):
+        validate_image_url(str(path))
+    with pytest.raises(ImageError, match="empty"):
+        validate_image_url("   ")
+    with pytest.raises(ImageError, match="not an image"):
+        validate_image_url("data:text/plain;base64,AAAA")
+    with pytest.raises(ImageError, match="no payload"):
+        validate_image_url("data:image/png;base64,")
+    with pytest.raises(ImageError, match="no host"):
+        validate_image_url("https://")
+
+
+# -- reading an image --------------------------------------------------------
+
+def test_the_image_request_matches_the_probed_shape():
+    calls: list[tuple[str, dict]] = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        calls.append((request.url.path, json.loads(request.content)))
+        return httpx.Response(200, json=chat_response({"A": -0.1, "B": -3.0, "1": -9.0}))
+
+    readout = make_image_readout(handler)
+    read = readout.read_image({"sms": "hi"}, Choice("Is this spam?", {"spam": None, "ham": None}), IMAGE_URL)
+
+    assert len(calls) == 1
+    path, body = calls[0]
+    assert path == "/v1/chat/completions"
+    assert body["model"] == "test-model"
+    assert body["max_tokens"] == 1
+    assert body["temperature"] == 0
+    assert body["logprobs"] is True
+    assert body["top_logprobs"] == 20
+    assert body["prompt_logprobs"] == 0
+    assert body["chat_template_kwargs"] == {"enable_thinking": False}
+
+    system, user = body["messages"]
+    assert system == {"role": "system", "content": DIRECT_SYSTEM}
+    assert user["role"] == "user"
+    image_part, text_part = user["content"]
+    assert image_part == {"type": "image_url", "image_url": {"url": IMAGE_URL}}
+    assert text_part["type"] == "text"
+    payload = json.loads(text_part["text"])
+    assert payload["evidence"] == {"sms": "hi"}
+    assert payload["criterion"] == "Is this spam?"
+    assert payload["options"] == [
+        {"letter": "A", "description": "spam"},
+        {"letter": "B", "description": "ham"},
+    ]
+
+    assert read.requests == 1
+    assert read.prompt_tokens == 512
+    assert read.sampled == "A"
+    assert read.missing_from_top == []
+    assert read.answer() == "A"
+    assert set(read.logprobs) == {"A", "B"}
+    assert math.isclose(sum(read.probabilities.values()), 1.0)
+
+
+def test_the_image_readout_reads_the_same_distribution_as_the_text_readout():
+    readout = make_image_readout(lambda request: httpx.Response(200, json=chat_response({"A": -0.5, "B": -1.5})))
+    read = readout.read_image("state", image_question(), IMAGE_URL)
+    assert read.probabilities["A"] == pytest.approx(math.e ** -0.5 / (math.e ** -0.5 + math.e ** -1.5))
+
+
+def test_the_answer_boundary_token_must_be_one_token():
+    readout = make_image_readout(lambda request: httpx.Response(200, json=chat_response({"A": -0.1, "B": -3.0})))
+    assert readout.answer_prefix_id() == int(ANSWER_TOKEN_ID)
+
+    class MergingTokenizer(ImageStubTokenizer):
+        def encode(self, text: str, add_special_tokens: bool = False) -> list[int]:
+            if text == ANSWER_PREFIX:
+                return [1, 2]
+            return super().encode(text, add_special_tokens=add_special_tokens)
+
+    readout._tokenizer = MergingTokenizer()
+    with pytest.raises(ReadoutError, match="not one token"):
+        readout.answer_prefix_id()
+
+
+def test_a_wrong_last_prompt_token_fails_the_boundary_check():
+    readout = make_image_readout(lambda request: httpx.Response(
+        200, json=chat_response({"A": -0.1, "B": -3.0}, prompt_token="<bos>")))
+    with pytest.raises(ReadoutError, match="not read at the answer boundary"):
+        readout.read_image("state", image_question(), IMAGE_URL)
+
+
+def test_a_boundary_token_from_another_tokenizer_fails():
+    readout = make_image_readout(lambda request: httpx.Response(
+        200, json=chat_response({"A": -0.1, "B": -3.0}, prompt_token_id="999")))
+    with pytest.raises(ReadoutError, match="not read at the answer boundary"):
+        readout.read_image("state", image_question(), IMAGE_URL)
+
+
+def test_a_missing_boundary_entry_fails():
+    for response in [
+        broken(lambda r: r.pop("prompt_logprobs")),
+        broken(lambda r: r.update({"prompt_logprobs": [None]})),
+        broken(lambda r: r["prompt_logprobs"].append(None)),
+    ]:
+        readout = make_image_readout(lambda request: httpx.Response(200, json=response))
+        with pytest.raises(ReadoutError, match="boundary"):
+            readout.read_image("state", image_question(), IMAGE_URL)
+
+
+def test_an_option_outside_the_returned_top_k_is_a_hard_error():
+    calls: list[dict] = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        calls.append(json.loads(request.content))
+        return httpx.Response(200, json=chat_response({"A": -0.5, "B": -1.5}))
+
+    readout = make_image_readout(handler)
+    with pytest.raises(ReadoutError) as excinfo:
+        readout.read_image("state", image_question(3), IMAGE_URL)
+    message = str(excinfo.value)
+    assert "C" in message
+    assert "no letter fallback" in message
+    assert "max-logprobs" in message
+    assert len(calls) == 1  # no fallback request, and no renormalized answer
+
+
+def test_more_options_than_requested_logprobs_fails_before_any_request():
+    calls: list[httpx.Request] = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        calls.append(request)
+        return httpx.Response(200, json=chat_response({"A": -0.1, "B": -3.0}))
+
+    readout = make_image_readout(handler)
+    with pytest.raises(ReadoutError, match="no letter fallback"):
+        readout.read_image("state", image_question(3), IMAGE_URL, top_logprobs=2)
+    assert calls == []
+
+
+def test_a_bad_image_is_rejected_before_any_request():
+    calls: list[httpx.Request] = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        calls.append(request)
+        return httpx.Response(200, json=chat_response({"A": -0.1, "B": -3.0}))
+
+    readout = make_image_readout(handler)
+    with pytest.raises(ImageError, match="prepare_image"):
+        readout.read_image("state", image_question(), "cat.png")
+    with pytest.raises(ReadoutError, match="positive integer"):
+        readout.read_image("state", image_question(), IMAGE_URL, top_logprobs=0)
+    assert calls == []
+
+
+@pytest.mark.parametrize("response,match", [
+    ({"choices": []}, "no choices"),
+    (broken(lambda r: r["choices"][0].update({"logprobs": None})), "no logprobs.content"),
+    (broken(lambda r: r["choices"][0].update({"logprobs": ["invalid"]})), "no logprobs.content"),
+    (broken(lambda r: r["choices"][0].update({"logprobs": {"content": []}})), "no logprobs.content"),
+    (broken(lambda r: r["choices"][0]["logprobs"]["content"][0].update({"top_logprobs": []})), "no top_logprobs"),
+    (broken(lambda r: r["choices"][0]["logprobs"]["content"][0].update({"top_logprobs": [{"token": "A"}]})), "malformed"),
+    (broken(lambda r: r["choices"][0]["logprobs"]["content"][0].update({"top_logprobs": [{"logprob": -1.0}]})), "malformed"),
+    (chat_response({"A": float("nan"), "B": -1.0}), "malformed"),
+    (chat_response({"A": float("inf"), "B": -1.0}), "malformed"),
+])
+def test_malformed_chat_responses_are_reported(response, match):
+    readout = make_image_readout(lambda request: httpx.Response(200, text=json.dumps(response)))
+    with pytest.raises(ReadoutError, match=match):
+        readout.read_image("state", image_question(), IMAGE_URL)
+
+
+def test_a_non_json_or_failed_chat_response_is_reported():
+    readout = make_image_readout(lambda request: httpx.Response(200, text="<html>not json</html>"))
+    with pytest.raises(ReadoutError, match="did not return JSON"):
+        readout.read_image("state", image_question(), IMAGE_URL)
+
+    readout = make_image_readout(lambda request: httpx.Response(400, json={"error": {"message": "nope"}}))
+    with pytest.raises(ReadoutError, match="HTTP 400"):
+        readout.read_image("state", image_question(), IMAGE_URL)
+
+
+def test_debug_carries_the_messages_and_the_full_top_logprobs():
+    handler = lambda request: httpx.Response(200, json=chat_response({"A": -0.1, "B": -3.0, "1": -9.0}))
+    readout = make_image_readout(handler)
+    plain = readout.read_image("state", image_question(), IMAGE_URL)
+    assert plain.messages is None
+    assert plain.top_logprobs == {}
+    assert plain.prompt is None  # the server rendered the prompt on this path
+
+    debug = readout.read_image("state", image_question(), IMAGE_URL, debug=True)
+    assert debug.messages[1]["content"][0] == {"type": "image_url", "image_url": {"url": IMAGE_URL}}
+    assert debug.top_logprobs["1"] == -9.0  # non-letters are visible, never answers
+    assert set(debug.probabilities) == {"A", "B"}
+
+
+def test_the_image_never_enters_the_evidence():
+    state = {"note": "a red square"}
+    calls: list[dict] = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        calls.append(json.loads(request.content))
+        return httpx.Response(200, json=chat_response({"A": -0.1, "B": -3.0}))
+
+    readout = make_image_readout(handler)
+    readout.read_image(state, image_question(), IMAGE_URL)
+    assert state == {"note": "a red square"}  # the caller's state is not mutated
+    text_part = calls[0]["messages"][1]["content"][1]
+    assert json.loads(text_part["text"])["evidence"] == {"note": "a red square"}
 
 
 # -- calibration -------------------------------------------------------------
@@ -411,3 +863,217 @@ def test_calibration_is_applied_by_default_and_can_be_turned_off():
     assert calibrated["intent"]["probabilities"]["a"] < raw["intent"]["probabilities"]["a"]
     assert calibrated.answers["intent"].calibrated is True
     assert raw.answers["intent"].calibrated is False
+
+
+# -- the client on an image --------------------------------------------------
+
+def make_image_model(handler, **kwargs) -> DecisionModel:
+    model = DecisionModel(base_url="http://test.local", model="test-model",
+                          transport=httpx.MockTransport(handler), **kwargs)
+    model.readout._tokenizer = ImageStubTokenizer()
+    return model
+
+
+def dual_handler(chat: dict | None = None, text: dict | None = None):
+    """Answer the chat and the completions paths, so one test can compare them."""
+    chat_body = chat if chat is not None else chat_response({"A": -0.1, "B": -3.0})
+    text_body = text if text is not None else top_logprobs({"A": -0.1, "B": -3.0})
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        if request.url.path == "/v1/chat/completions":
+            return httpx.Response(200, json=chat_body)
+        return httpx.Response(200, json=text_body)
+
+    return handler
+
+
+def test_classify_with_an_image_returns_the_label():
+    calls: list[dict] = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        assert request.url.path == "/v1/chat/completions"
+        calls.append(json.loads(request.content))
+        return httpx.Response(200, json=chat_response({"A": -0.1, "B": -3.0}))
+
+    with make_image_model(handler) as model:
+        result = model.classify({"note": "a red square"}, {"color": ["red", "blue"]}, image=IMAGE_URL)
+    assert result["color"] == "red"
+    assert result.answers["color"].type == "choice"
+    assert result.answers["color"].requests == 1
+    assert result.meta["input_type"] == "image"
+    assert len(calls) == 1
+
+
+def test_decide_with_an_image_returns_typed_answers():
+    with make_image_model(dual_handler()) as model:
+        result = model.decide(
+            {"note": "a red square"},
+            {"ok": Noul("Is this a valid image?"),
+             "route": Choice("Which queue?", {"left": None, "right": None})},
+            image=IMAGE_URL,
+        )
+    assert result["ok"] == pytest.approx(0.948, abs=0.005)
+    assert result["route"] == "left"
+    assert result.answers["ok"].type == "noul"
+    assert result.answers["route"].type == "choice"
+    assert result.meta["input_type"] == "image"
+
+
+def test_each_image_head_costs_one_request_and_is_charged():
+    calls: list[dict] = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        calls.append(json.loads(request.content))
+        return httpx.Response(200, json=chat_response({"A": -0.1, "B": -3.0}, prompt_tokens=512))
+
+    with make_image_model(handler) as model:
+        result = model.classify({"note": "x"}, {"color": ["red", "blue"], "shape": ["square", "circle"]},
+                                image=IMAGE_URL)
+    assert len(calls) == 2
+    assert result.usage["requests"] == 2
+    assert result.usage["input_tokens"] == 1024
+    assert result.usage["output_tokens"] == 2
+    assert result["color"] == "red" and result["shape"] == "square"
+
+
+def test_image_multi_label_asks_one_question_per_label():
+    calls: list[dict] = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        calls.append(json.loads(request.content))
+        return httpx.Response(200, json=chat_response({"A": -0.1, "B": -3.0}))
+
+    with make_image_model(handler) as model:
+        result = model.classify(
+            {"note": "x"},
+            {"topics": {"labels": ["hvac", "billing"], "multi_label": True, "cls_threshold": 0.4}},
+            image=IMAGE_URL,
+        )
+    assert len(calls) == 2
+    assert result["topics"] == ["hvac", "billing"]
+    assert result.usage["requests"] == 2
+    assert set(result.raw) == {"topics:hvac", "topics:billing"}
+
+
+def test_images_default_to_raw_probabilities_and_can_opt_into_calibration():
+    with make_image_model(dual_handler()) as model:
+        image_default = model.classify({"note": "x"}, {"color": ["red", "blue"]},
+                                       image=IMAGE_URL, include_probabilities=True)
+        image_tempered = model.classify({"note": "x"}, {"color": ["red", "blue"]},
+                                        image=IMAGE_URL, include_probabilities=True, calibrated=True)
+        text_default = model.classify({"note": "x"}, {"color": ["red", "blue"]}, include_probabilities=True)
+        text_raw = model.classify({"note": "x"}, {"color": ["red", "blue"]},
+                                  include_probabilities=True, calibrated=False)
+
+    assert image_default.answers["color"].calibrated is False
+    assert image_default.answers["color"].temperature == 1.0
+    assert image_default.meta["calibrated"] is False
+    assert image_default.meta["input_type"] == "image"
+    # The image default is the raw distribution, the same one the text path returns on request.
+    assert image_default["color"]["probabilities"]["red"] == pytest.approx(
+        text_raw["color"]["probabilities"]["red"])
+    # An explicit calibrated=True applies the same scaling the text path applies by default.
+    assert image_tempered.answers["color"].calibrated is True
+    assert image_tempered["color"]["probabilities"]["red"] < image_default["color"]["probabilities"]["red"]
+    assert text_default.meta["calibrated"] is True
+    assert text_default.meta["input_type"] == "text"
+    assert text_default["color"]["probabilities"]["red"] == pytest.approx(
+        image_tempered["color"]["probabilities"]["red"])
+
+
+def test_an_image_does_not_mutate_or_enter_the_evidence(tmp_path):
+    path = tmp_path / "cat.png"
+    path.write_bytes(b"\x89PNG\r\n\x1a\n" + b"pretend image bytes")
+    state = {"note": "a red square"}
+    calls: list[dict] = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        calls.append(json.loads(request.content))
+        return httpx.Response(200, json=chat_response({"A": -0.1, "B": -3.0}))
+
+    with make_image_model(handler) as model:
+        result = model.classify(state, {"color": ["red", "blue"]}, image=path)
+
+    assert result["color"] == "red"
+    assert state == {"note": "a red square"}
+    body = json.dumps(calls[0])
+    assert "cat.png" not in body
+    assert str(tmp_path) not in body
+    image_part, text_part = calls[0]["messages"][1]["content"]
+    assert image_part["image_url"]["url"].startswith("data:image/png;base64,")
+    assert json.loads(text_part["text"])["evidence"] == {"note": "a red square"}
+
+
+def test_a_local_image_is_prepared_once_for_many_heads(tmp_path, monkeypatch):
+    from shisa_de import client as client_module
+
+    path = tmp_path / "cat.png"
+    path.write_bytes(b"\x89PNG\r\n\x1a\n" + b"pretend image bytes")
+    prepared: list = []
+    original = client_module.prepare_image
+
+    def counting(image):
+        prepared.append(image)
+        return original(image)
+
+    monkeypatch.setattr(client_module, "prepare_image", counting)
+    calls: list[dict] = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        calls.append(json.loads(request.content))
+        return httpx.Response(200, json=chat_response({"A": -0.1, "B": -3.0}))
+
+    with make_image_model(handler) as model:
+        model.classify({"note": "x"}, {"color": ["red", "blue"], "shape": ["square", "circle"]}, image=path)
+    assert len(prepared) == 1
+    assert len(calls) == 2
+
+
+def test_a_bad_image_is_rejected_before_the_client_sends_anything():
+    calls: list[httpx.Request] = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        calls.append(request)
+        return httpx.Response(200, json=chat_response({"A": -0.1, "B": -3.0}))
+
+    with make_image_model(handler) as model:
+        with pytest.raises(ImageError, match="extension"):
+            model.classify({"note": "x"}, {"color": ["red", "blue"]}, image="cat.gif")
+        with pytest.raises(ImageError, match="empty"):
+            model.classify({"note": "x"}, {"color": ["red", "blue"]}, image="")
+    assert calls == []
+
+
+def test_image_top_logprobs_is_forwarded_to_the_readout():
+    calls: list[dict] = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        calls.append(json.loads(request.content))
+        return httpx.Response(200, json=chat_response({"A": -0.1, "B": -3.0}))
+
+    with make_image_model(handler, image_top_logprobs=64) as model:
+        model.classify({"note": "x"}, {"color": ["red", "blue"]}, image=IMAGE_URL)
+    assert calls[0]["top_logprobs"] == 64
+
+
+def test_a_missing_image_letter_fails_the_client_call_rather_than_guessing():
+    calls: list[dict] = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        calls.append(json.loads(request.content))
+        return httpx.Response(200, json=chat_response({"A": -0.1, "B": -3.0}))
+
+    with make_image_model(handler) as model:
+        with pytest.raises(ReadoutError, match="no letter fallback"):
+            model.classify({"note": "x"}, {"color": ["red", "blue", "green"]}, image=IMAGE_URL)
+    assert len(calls) == 1
+
+
+def test_debug_keeps_the_image_messages_out_of_the_default_raw_record():
+    with make_image_model(dual_handler()) as model:
+        plain = model.classify({"note": "x"}, {"color": ["red", "blue"]}, image=IMAGE_URL)
+        debug = model.classify({"note": "x"}, {"color": ["red", "blue"]}, image=IMAGE_URL, debug=True)
+    assert "prompt" not in plain.raw["color"]
+    assert "top_logprobs" not in plain.raw["color"]
+    assert debug.raw["color"]["prompt"] is None  # the server rendered the prompt
+    assert debug.raw["color"]["top_logprobs"]["A"] == -0.1

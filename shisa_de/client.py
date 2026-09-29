@@ -18,11 +18,13 @@ import os
 import time
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass, field
+from pathlib import Path
 from typing import Any, Mapping, Sequence
 
 import httpx
 
 from .calibration import Calibration, confidence as wire_confidence, load_calibration, temper_binary, temper_distribution
+from .images import prepare_image
 from .questions import Choice, Noul, Question, QuestionError, Score
 from .readout import LETTERS, READOUT_VERSION, LetterRead, Readout, ReadoutError
 
@@ -247,14 +249,20 @@ class DecisionModel:
         local_files_only: bool = False,
         timeout: float = 120.0,
         max_workers: int = 8,
+        image_top_logprobs: int = 20,
         calibration: Calibration | None = None,
         transport: httpx.BaseTransport | None = None,
         readout: Readout | None = None,
     ) -> None:
         self.base_url = (base_url or os.environ.get(ENDPOINT_ENV) or DEFAULT_ENDPOINT).rstrip("/")
+        if self.base_url.endswith("/v1"):
+            self.base_url = self.base_url[:-3]
         self.model = model or DEFAULT_MODEL
         self.calibration = calibration if calibration is not None else load_calibration()
         self.max_workers = max(1, int(max_workers))
+        if isinstance(image_top_logprobs, bool) or not isinstance(image_top_logprobs, int) or image_top_logprobs < 1:
+            raise ValueError("image_top_logprobs must be a positive integer")
+        self.image_top_logprobs = image_top_logprobs
         if readout is not None:
             self.readout = readout
         else:
@@ -265,7 +273,7 @@ class DecisionModel:
                 tokenizer_revision=tokenizer_revision,
                 local_files_only=local_files_only,
                 timeout=timeout,
-                api_key=api_key or _api_key_from_env(),
+                api_key=api_key if api_key is not None else _api_key_from_env(),
                 transport=transport,
             )
 
@@ -333,7 +341,8 @@ class DecisionModel:
         *,
         include_confidence: bool = False,
         include_probabilities: bool = False,
-        calibrated: bool = True,
+        image: str | Path | None = None,
+        calibrated: bool | None = None,
         debug: bool = False,
     ) -> Decision:
         """Classify a state against named label sets.
@@ -342,6 +351,9 @@ class DecisionModel:
         mapping of label to description, ``{"levels": [...]}`` for an ordered
         scale, ``{"labels": [...], "multi_label": True}`` for several labels at
         once, or a question object for full control.
+
+        ``image`` attaches a local file, HTTP(S) URL, or image data URL.
+        Calibration defaults to enabled for text and disabled for images.
 
         Returns a `Decision`: ``result["intent"]`` is the chosen label, and
         ``result.answers["intent"]`` carries the distribution behind it.
@@ -352,7 +364,7 @@ class DecisionModel:
             question, options = _question_from_head(head, spec)
             questions[head] = question
             parsed[head] = options
-        decision = self._run(state, questions, calibrated=calibrated, debug=debug)
+        decision = self._run(state, questions, image=image, calibrated=calibrated, debug=debug)
         for head, question in questions.items():
             if isinstance(question, _MultiLabel):
                 threshold = parsed[head]["cls_threshold"]
@@ -388,7 +400,8 @@ class DecisionModel:
         state: Any,
         questions: Mapping[str, Any],
         *,
-        calibrated: bool = True,
+        image: str | Path | None = None,
+        calibrated: bool | None = None,
         debug: bool = False,
     ) -> Decision:
         """Ask typed questions and get typed answers.
@@ -396,9 +409,11 @@ class DecisionModel:
         ``questions`` maps a question id to a `Noul`, `Choice`, or `Score`, or
         to the label-set shorthand `classify` accepts. The dict view returns
         each answer's primary value; ``result.answers`` returns the full answer.
+        ``image`` attaches a local file, HTTP(S) URL, or image data URL.
+        Calibration defaults to enabled for text and disabled for images.
         """
         parsed = {head: _question_from_head(head, spec)[0] for head, spec in questions.items()}
-        decision = self._run(state, parsed, calibrated=calibrated, debug=debug)
+        decision = self._run(state, parsed, image=image, calibrated=calibrated, debug=debug)
         for head, answer in decision.answers.items():
             decision[head] = answer.value
         return decision
@@ -412,10 +427,14 @@ class DecisionModel:
         state: Any,
         questions: Mapping[str, Question],
         *,
-        calibrated: bool,
+        image: str | Path | None,
+        calibrated: bool | None,
         debug: bool,
     ) -> Decision:
         started = time.perf_counter()
+        image_url = prepare_image(image) if image is not None else None
+        if calibrated is None:
+            calibrated = image_url is None
         decision = Decision()
         work: list[tuple[str, Question]] = []
         for head, question in questions.items():
@@ -426,7 +445,13 @@ class DecisionModel:
 
         def run(item: tuple[str, Question]) -> tuple[str, Question, LetterRead, list[tuple[str, Any]]]:
             head, question = item
-            read, options = self.readout.evaluate(state, question, debug=debug)
+            if image_url is None:
+                read, options = self.readout.evaluate(state, question, debug=debug)
+            else:
+                read = self.readout.read_image(
+                    state, question, image_url, top_logprobs=self.image_top_logprobs, debug=debug,
+                )
+                options = question.options()
             return head, question, read, options
 
         if self.max_workers > 1 and len(work) > 1:
@@ -453,6 +478,8 @@ class DecisionModel:
             if debug:
                 decision.raw[head]["prompt"] = read.prompt
                 decision.raw[head]["top_logprobs"] = read.top_logprobs
+                if read.messages is not None:
+                    decision.raw[head]["messages"] = read.messages
             input_tokens += read.prompt_tokens
             requests += read.requests
         decision.usage = {
@@ -465,6 +492,7 @@ class DecisionModel:
             "model": self.model,
             "base_url": self.base_url,
             "readout_version": READOUT_VERSION,
+            "input_type": "image" if image_url is not None else "text",
             "calibration": self.calibration.id,
             "calibrated": calibrated,
         }

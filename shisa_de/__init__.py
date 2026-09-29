@@ -11,6 +11,7 @@ served rather than loaded, so nothing here downloads weights.
 
 from .calibration import Calibration, confidence, load_calibration, temper_binary, temper_distribution
 from .client import DEFAULT_ENDPOINT, DEFAULT_MODEL, Answer, Decision, DecisionModel
+from .images import ImageError
 from .questions import MAX_OPTIONS, Choice, Noul, Question, QuestionError, Score
 from .readout import DIRECT_SYSTEM, LETTERS, READOUT_VERSION, LetterRead, Readout, ReadoutError, Slot, softmax
 
@@ -25,6 +26,7 @@ __all__ = [
     "DIRECT_SYSTEM",
     "Decision",
     "DecisionModel",
+    "ImageError",
     "LETTERS",
     "LetterRead",
     "MAX_OPTIONS",

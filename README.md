@@ -1,200 +1,261 @@
 # shisa-de
 
-Talk to Shisa DE-1 decision models. Ask typed questions about a state, get typed
-answers back, with the distribution and the request cost attached.
+A Python client for [Shisa DE-1](https://huggingface.co/shisa-ai/shisa-de-1), a
+model for classification and typed decisions. Use it through the hosted
+[Shisa Platform](https://platform.shisa.ai/) or a local OpenAI-compatible server
+serving DE-1.
+
+Give it text, images, or structured data and a set of labels or questions. It returns
+answers, probabilities, and request usage—not generated prose. The client loads
+only the tokenizer; model weights stay on the server.
+
+## Benchmark snapshot
+
+| Benchmark | Shisa DE-1 | Jev |
+| --- | ---: | ---: |
+| [JevBench standard accuracy](https://github.com/fstandhartinger/jevbench) | 98.6% | 98.6% |
+| [JevBench hard accuracy](https://github.com/fstandhartinger/jevbench) | 64.9% | 73.0% |
+| [AG News accuracy](https://huggingface.co/datasets/fancyzhx/ag_news) | 89.5% | 90.0% |
+| [Median latency](https://huggingface.co/shisa-ai/shisa-de-1#evaluation) | 20 ms (local) | 223 ms (hosted) |
+
+## Install
+
+Requires Python 3.10 or newer and Git. Install directly from GitHub:
+
+```bash
+python -m pip install "git+https://github.com/shisa-ai/shisa-de.git"
+```
+
+The package is not published to PyPI. For development, see [Development](#development).
+
+## Use the Shisa Platform
+
+Get an API key from [platform.shisa.ai](https://platform.shisa.ai/) and set it in
+your environment:
+
+```bash
+export SHISA_API_KEY="your-api-key"
+```
+
+No endpoint or model argument is needed:
 
 ```python
 from shisa_de import DecisionModel
 
-de = DecisionModel()  # uses SHISA_API_KEY and the hosted DE-1 endpoint
-
-de.classify(
-    {"sms": "WINNER!! You have won a $1000 gift card. Claim it now: bit.ly/xyz",
-     "sender": "+1-555-0199"},
-    {"intent": {"spam": "Unsolicited bulk or scam message", "ham": "Ordinary message"}},
-)
-# {'intent': 'spam'}
+with DecisionModel() as de:
+    result = de.classify(
+        "WINNER! Claim your free prize now!",
+        {"intent": ["spam", "ham"]},
+    )
+    print(result["intent"])  # spam
 ```
 
-DE-1 runs on a GPU server: this package holds an HTTP client and a tokenizer,
-and downloads no weights. Nothing is fetched at import time. The tokenizer is
-loaded lazily when first needed and may require a download from Hugging Face.
+The defaults are model `shisa-ai/shisa-de-1` at
+`https://api.shisa.ai/openai`. The tokenizer is loaded lazily from Hugging Face
+when first needed, so the first call may require a download. Nothing is fetched
+at import time. PyTorch and a local GPU are not required for the client.
 
-## Install
-
-```bash
-pip install -e .        # from a checkout; not published to PyPI yet
-```
-
-For the hosted service, set only your Shisa API key:
+Check your setup from the command line:
 
 ```bash
-export SHISA_API_KEY=...
 shisa-de doctor
 shisa-de ask --state 'WINNER! Claim your free prize now!' --labels spam,ham
 ```
 
-`DecisionModel()` and the CLI default to `shisa-ai/shisa-de-1` at
-`https://api.shisa.ai/openai`. No endpoint or model argument is required.
-`doctor` checks access to the model list, that DE-1 is listed, and the local
-tokenizer's answer boundary; `ask` verifies an actual completion request.
+`doctor` checks model-list access, the model ID, and the tokenizer's answer
+boundary. `ask` makes an actual decision request.
 
-Explicit `api_key=` takes precedence over `SHISA_DE_API_KEY`, then
-`SHISA_API_KEY`. Explicit `base_url=` takes precedence over
-`SHISA_DE_ENDPOINT`, then the hosted default. Leave the DE-specific environment
-variables unset to use just `SHISA_API_KEY` with the hosted defaults.
+## Use a local server
 
-## Classify
-
-`classify` takes a state and a mapping of head name to label set. Each head is
-one question, sent as its own request.
+First start an OpenAI-compatible server with DE-1 loaded. See the
+[DE-1 model card](https://huggingface.co/shisa-ai/shisa-de-1) for serving guidance.
+Then point this client at it:
 
 ```python
-ticket = {"subject": "Charged twice for order 4812",
-          "body": "I was billed twice for the same order and I want my money back."}
+from shisa_de import DecisionModel
 
-de.classify(ticket, {"intent": ["refund_request", "cancel_order", "order_status", "speak_to_human"]})
-# {'intent': 'refund_request'}
-
-de.classify(ticket, {"intent": ["refund_request", "cancel_order"]}, include_confidence=True)
-# {'intent': {'label': 'refund_request', 'confidence': 0.954}}
-
-de.classify(ticket, {"intent": ["refund_request", "cancel_order"]}, include_probabilities=True)
-# {'intent': {'label': 'refund_request', 'confidence': 0.954,
-#             'probabilities': {'refund_request': 0.977, 'cancel_order': 0.023}}}
+with DecisionModel.from_endpoint(
+    "http://127.0.0.1:8021/v1",
+    model="shisa-ai/shisa-de-1",
+    api_key="",  # no authentication; do not use a key from the environment
+) as de:
+    result = de.classify(
+        "I was charged twice. Please refund the duplicate payment.",
+        {"intent": ["refund_request", "order_status", "cancel_order"]},
+    )
+    print(result["intent"])
 ```
 
-Several heads in one call run concurrently and come back together:
+Both a server root URL and a URL ending in `/v1` are accepted. For an
+authenticated local server, pass its key as `api_key="your-local-key"`.
+If the server uses an alias for the model, pass that alias as `model=` and
+`tokenizer="shisa-ai/shisa-de-1"` to keep using the checkpoint's tokenizer.
 
-```python
-comment = "The dashboard has been broken for three days and nobody has replied to my email."
+For text, the server needs `/v1/completions` with `logprobs` and
+`prompt_logprobs`; `doctor` also needs `/v1/models`. vLLM supports these.
+See the [readout contract](docs/READOUT.md) for the exact requests.
 
-de.classify(comment, {
-    "sentiment": ["positive", "negative", "mixed"],
-    "urgency": ["low", "normal", "high"],
-    "escalate": {"labels": ["yes", "no"], "prompt": "Should a human read this today?"},
-})
-# {'sentiment': 'negative', 'urgency': 'high', 'escalate': 'yes'}
+For the CLI, use `--base-url` or set `SHISA_DE_ENDPOINT`. In a shell without
+hosted credentials:
+
+```bash
+export SHISA_DE_ENDPOINT=http://127.0.0.1:8021/v1
+shisa-de doctor
+shisa-de ask --state 'Please refund my duplicate payment.' --labels refund_request,order_status
 ```
 
-### Label set forms
+### Configuration precedence
 
-| Form | Meaning |
+| Setting | Resolution order |
 | --- | --- |
-| `["a", "b"]` | A choice over the labels. The question is derived from the head name. |
-| `{"a": "description", "b": "description"}` | A choice with descriptions shown to the model. |
-| `{"labels": ["a", "b"], "prompt": "..."}` | The same, with your own question. |
-| `{"labels": ["a", "b"], "multi_label": True, "cls_threshold": 0.5}` | One yes/no question per label; returns the labels above the threshold. |
-| `{"levels": ["low", "medium", "high"]}` | An ordered scale; returns the level, with the weighted position on the answer object. |
-| `Noul(...)`, `Choice(...)`, `Score(...)` | The question object itself, for full control. |
+| Endpoint | `base_url=` / CLI `--base-url`, then `SHISA_DE_ENDPOINT`, then the hosted default |
+| API key | `api_key=`, then `SHISA_DE_API_KEY`, then `SHISA_API_KEY` |
+| Model | `model=` / CLI `--model`, otherwise `shisa-ai/shisa-de-1` |
+| Tokenizer | `tokenizer=` / CLI `--tokenizer`, otherwise the model ID |
 
-A head name becomes the question: `"urgency"` asks "What is the urgency?".
-Pass `prompt` when the default reads badly. One question can offer at most 26
-labels, because the model reads one answer letter per question.
+An explicit `api_key=""` disables authentication. Otherwise, environment keys
+are used for local endpoints too. Leave `SHISA_DE_ENDPOINT` and
+`SHISA_DE_API_KEY` unset to use the hosted defaults with only `SHISA_API_KEY`.
 
-## Decide
+## Classify with labels
 
-`decide` is the System One call: typed questions in, typed answers out. The dict
-view returns each answer's primary value; `result.answers` carries the
-distribution, confidence, and cost behind it.
+Each named label set is a separate question. Labels can be plain strings or a
+mapping from labels to descriptions:
 
 ```python
-from shisa_de import Choice, Noul, Score
+from shisa_de import DecisionModel
 
-msg = {"sms": "WINNER!! You have won a $1000 gift card. Claim it now: bit.ly/xyz", "sender": "+1-555-0199"}
-
-result = de.decide(msg, {
-    "is_spam": Noul("Is this message spam?"),
-    "ask": Choice("What does the sender want?", {
-        "card_details": "Payment card details",
-        "callback": "A support callback",
-        "nothing": "Nothing; it is routine",
-    }),
-    "risk": Score("How risky is acting on this message?", ["Safe", "Suspicious", "Dangerous"]),
-})
-
-dict(result)
-# {'is_spam': 0.99, 'ask': 'card_details', 'risk': 1.75}
+with DecisionModel() as de:
+    result = de.classify(
+        {"subject": "Charged twice", "body": "Please refund the duplicate charge."},
+        {"intent": {
+            "refund_request": "The customer wants money returned",
+            "order_status": "The customer wants a delivery update",
+        }},
+        include_probabilities=True,
+    )
+    print(result["intent"]["label"])
+    print(result["intent"]["probabilities"])
+    print(result.usage)
 ```
+
+Use `include_confidence=True` for a label and confidence without the full
+probability map. The default result maps each head name directly to its label.
+
+Other label-set forms:
+
+| Form | Behavior |
+| --- | --- |
+| `["a", "b"]` | Choose one label; derive the question from the head name |
+| `{"a": "description", "b": "description"}` | Choose one label using its description |
+| `{"labels": ["a", "b"], "prompt": "Which applies?"}` | Supply your own question |
+| `{"labels": ["a", "b"], "multi_label": True, "cls_threshold": 0.5}` | Ask yes/no for each label; return labels above the threshold |
+| `{"levels": ["low", "medium", "high"]}` | Choose a level on an ordered scale |
+
+## Classify images
+
+Pass a local image path, an HTTP(S) image URL, or a base64 image data URL as
+`image=`. The same API works with the Shisa Platform and a local DE-1 server
+with vision enabled:
 
 ```python
-result.answers["ask"].probabilities
-# {'card_details': 0.94, 'callback': 0.03, 'nothing': 0.03}
-result.answers["ask"].confidence
-# 0.9
-result.answers["risk"].level, result.answers["risk"].score
-# ('Dangerous', 1.75)
-result.usage
-# {'input_tokens': 427, 'output_tokens': 3, 'requests': 3, 'wall_ms': 131.96}
-result.to_wire()          # the System One response shape: model, answers, usage
+from shisa_de import DecisionModel
+
+with DecisionModel() as de:
+    result = de.classify(
+        {},
+        {"animal": ["cat", "dog", "bird"]},
+        image="photo.jpg",
+        include_probabilities=True,
+    )
+    print(result["animal"]["label"])
+    print(result["animal"]["probabilities"])
 ```
 
-Answer values: a noul returns `P(yes)`, a choice returns the option key, and a
-score returns the probability-weighted position over the levels. `classify`
-returns the level description for an ordered scale instead, so a scale reads as
-one of its levels.
+`decide(..., image="photo.jpg")` supports typed questions about an image too.
 
-## Calibration and confidence
+Local files are uploaded; URLs are fetched by the server. Supported formats:
+PNG, JPEG, and WebP. Image probabilities are uncalibrated by default.
 
-Probabilities are tempered by default with the temperatures fitted for DE-1
-(noul 1.69, choice and score 1.90), which sharpens the distribution without
-changing the answer. Every answer records `calibrated` and `temperature`, so
-raw and tempered scores are never mixed by accident. Pass `calibrated=False` for
-raw logprob-derived probabilities.
-
-`confidence` is `(K * p_max - 1) / (K - 1)`, the statistic the hosted System One
-API returns. It summarizes the distribution; a decision that depends on the
-shape of the distribution should read `probabilities` instead.
-
-Repeated identical requests on the hosted endpoint returned bit-identical
-logprobs, with one exception in fifteen that moved the probability by 0.001.
-Treat a threshold inside that band as undecided; [docs/READOUT.md](docs/READOUT.md)
-records the measurement.
-
-## Endpoints
-
-```python
-DecisionModel.from_pretrained("shisa-ai/shisa-de-1")                  # hosted, from the environment
-DecisionModel.from_endpoint("http://127.0.0.1:8021", model="shisa-ai/shisa-de-1")   # local vLLM
-DecisionModel(base_url=..., model=..., api_key=..., timeout=..., max_workers=8)
-```
-
-`from_pretrained` resolves the endpoint from `SHISA_DE_ENDPOINT`, then the
-hosted default, and downloads no weights. `max_workers` bounds how many
-questions run at once; each question is one request.
-
-## Command line
+The server must support images and token logprobs on `/v1/chat/completions`.
+If an option is missing from the returned logprobs, the client raises an error.
+For larger label sets on a local server, raise its `--max-logprobs` and set
+`DecisionModel(image_top_logprobs=128)` to match.
 
 ```bash
-shisa-de doctor                          # endpoint, served model, boundary check
-shisa-de ask --labels spam,ham           # one classification, JSON out
-shisa-de explain --labels spam,ham       # every step of the readout, printed
+shisa-de ask --image photo.jpg --labels cat,dog,bird --prompt 'What animal is shown?'
 ```
 
-`shisa-de explain` prints the rendered prompt, the answer slot token ids, the
-top logprobs with the answer slots marked, the normalized distribution, and the
-equivalent `curl`.
+## Ask typed questions
 
-## The readout
+`decide` supports yes/no probabilities (`Noul`), named choices (`Choice`), and
+ordered scores (`Score`):
 
-DE-1 answers by reading one letter per question: the prompt carries lettered
-options, the request asks for one token with `logprobs`, and the answer is the
-highest-probability option letter. [docs/READOUT.md](docs/READOUT.md) is the
-full specification — request, rendered prompt, token ids, fallback for letters
-outside the top-k, the arithmetic from logprobs to answers, calibration
-provenance, measured costs, and a dependency-light reference implementation.
+```python
+from shisa_de import Choice, DecisionModel, Noul, Score
 
-## Tests
+with DecisionModel() as de:
+    result = de.decide(
+        "Reply with your full card number and CVV to claim your prize.",
+        {
+            "is_spam": Noul("Is this message spam?"),
+            "asks_for": Choice("What does the sender want?", {
+                "card_details": "Payment card details",
+                "callback": "A support callback",
+                "nothing": "Nothing; it is routine",
+            }),
+            "risk": Score("How risky is acting on this message?", [
+                "Safe", "Suspicious", "Dangerous",
+            ]),
+        },
+    )
+    print(dict(result))
+    print(result.answers["asks_for"].probabilities)
+    print(result.answers["risk"].level)
+    print(result.usage)
+```
+
+- `Noul` returns the probability of yes.
+- `Choice` returns the selected option key.
+- `Score` returns the probability-weighted, zero-based position in the scale.
+  The most likely level is available as `result.answers[name].level`.
+
+Each question has at most 26 options. Each question costs one request; text
+questions add a fallback request for each option missing from the top logprobs.
+Multi-label classification asks one question per label. Questions run
+concurrently; `max_workers=` controls concurrency. `result.usage` records the
+request and token counts.
+
+## Probabilities and calibration
+
+Text calls apply the bundled temperature scaling by default; image calls return
+raw probabilities. Pass `calibrated=False` for raw text probabilities too.
+Each answer records `calibrated` and `temperature`; `result.meta` records the
+readout version and calibration identity. See the [readout documentation](docs/READOUT.md)
+for the scoring and calibration details.
+
+## Development
 
 ```bash
-python -m pytest tests/                              # offline, no network
-SHISA_DE_LIVE=1 python -m pytest tests/test_live.py  # against a live endpoint
+git clone https://github.com/shisa-ai/shisa-de.git
+cd shisa-de
+python -m pip install -e '.[dev]'
+python -m pytest tests/
 ```
 
-## Links
+Offline tests use a stub tokenizer and mock HTTP transport. Live tests spend
+real API requests and are opt-in:
 
-- [docs/READOUT.md](docs/READOUT.md) — the readout contract, with samples
-- [shisa-ai/shisa-de-1](https://huggingface.co/shisa-ai/shisa-de-1) — model card, serving scripts, readout contract in prose
-- [shisa-ai/jevbench-results](https://github.com/shisa-ai/jevbench-results) — the harness and published JevBench numbers behind the model card
+```bash
+SHISA_DE_LIVE=1 python -m pytest tests/test_live.py -v
+```
 
-Apache-2.0; see [LICENSE](LICENSE).
+Live tests use the same endpoint and API-key environment variables as the
+client. `shisa-de explain --labels spam,ham` prints the prompt, token slots,
+logprobs, and final distribution for a live request.
+
+## License
+
+This client library is licensed under [Apache 2.0](LICENSE).
+See the [model card](https://huggingface.co/shisa-ai/shisa-de-1) for the model's
+license and usage requirements.

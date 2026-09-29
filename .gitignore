@@ -8,4 +8,6 @@ dist/
 .venv/
 venv/
 .env
+.env.*
+.pi/
 *.ipynb_checkpoints/

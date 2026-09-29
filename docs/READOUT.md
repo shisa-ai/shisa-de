@@ -8,11 +8,13 @@ into answers. Everything in the `shisa_de` package implements this page, and a
 client in another language can be written from it.
 
 Measured numbers on this page come from `shisa-ai/shisa-de-1` served by
-`vllm-0.26.0-tp2-c1aff9a1` on 2026-09-25. The readout version is
-`de1-letter-slots-v1`. Re-measure if the serving fingerprint changes; logprobs
-move slightly between serving shapes.
+`vllm-0.26.0-tp2-c1aff9a1` on 2026-09-25. Those text measurements used
+`de1-letter-slots-v1`. The current readout version is `de1-letter-slots-v2`:
+text rendering and scoring are unchanged; image input adds the chat-completions
+path described in [Image readout](#12-image-readout). Re-measure if the serving
+fingerprint changes; logprobs move slightly between serving shapes.
 
-- Readout version: `de1-letter-slots-v1`
+- Readout version: `de1-letter-slots-v2`
 - Maximum options per question: 26
 - Requests per question: 1, plus 1 per option letter outside the returned top-k
 - Answer position: the first generated token
@@ -406,7 +408,7 @@ requests. `DecisionModel` runs questions concurrently over a thread pool
 
 ## 10. Reference implementation
 
-The whole readout, with no dependencies beyond `httpx` and `transformers`:
+The text readout, using `httpx`, `transformers`, and `jinja2` for chat-template rendering:
 
 ```python
 import json, math, httpx
@@ -486,3 +488,65 @@ The outlier is larger than batching noise and did not reproduce. Treat a
 threshold that falls between 0.9913 and 0.9925 on this question as undecided
 rather than as a stable verdict, and re-measure on the endpoint you deploy
 against.
+
+## 12. Image readout
+
+`classify(..., image=...)` and `decide(..., image=...)` attach one image to each
+question. The image may be a local PNG, JPEG, or WebP file, an HTTP(S) URL, or a
+base64 image data URL. Local files become data URLs before concurrent requests
+start. The file name is not inserted into the evidence. Text-only calls retain
+the request and prompt specified above.
+
+Images use the server's multimodal processor and chat template:
+
+```http
+POST {base_url}/v1/chat/completions
+Authorization: Bearer $SHISA_API_KEY
+Content-Type: application/json
+```
+
+```json
+{
+  "model": "shisa-ai/shisa-de-1",
+  "messages": [
+    {"role": "system", "content": "Apply the supplied criterion to the supplied evidence. Choose exactly one listed option. Respond with only its uppercase letter, with no explanation or reasoning."},
+    {"role": "user", "content": [
+      {"type": "image_url", "image_url": {"url": "<image URL or data URL>"}},
+      {"type": "text", "text": "<JSON with evidence, criterion, and lettered options>"}
+    ]}
+  ],
+  "max_tokens": 1,
+  "temperature": 0,
+  "logprobs": true,
+  "top_logprobs": 20,
+  "prompt_logprobs": 0,
+  "chat_template_kwargs": {"enable_thinking": false}
+}
+```
+
+The system line, option order, and empty-description rule are unchanged.
+`image_top_logprobs` selects `top_logprobs`; the server must allow that limit.
+
+Before the request, resolve every option letter to one exact token. After the
+request, verify that the final entry of the response's root `prompt_logprobs`
+identifies `<channel|>` with the token ID resolved by the local tokenizer.
+This verifies the server-rendered answer boundary. Missing or mismatched
+boundary evidence is an error, not permission to read another position.
+
+Read `choices[0].logprobs.content[0].top_logprobs`, a list of token/logprob
+objects. Keep only the option letters and apply the same softmax as text.
+Every option must be present. Image requests have **no fallback**: appending an
+assistant letter does not reproduce the same multimodal answer boundary.
+Missing letters cause `ReadoutError`; raise the server's logprob limit and
+`image_top_logprobs` or reduce the option set. Never normalize an incomplete
+option distribution.
+
+Each successful image question costs one request. Input usage includes image
+tokens reported by the server. `result.meta["input_type"]` distinguishes
+`"image"` from `"text"`, and `readout_version` is `de1-letter-slots-v2` for both.
+Image answers default to `calibrated=False`: the bundled calibration record
+was fitted for the unchanged v1 text path, not images. Explicit
+`calibrated=True` applies the supplied calibration, but does not establish
+that it has been fitted for images. With `debug=True`, image requests expose
+`result.raw[head]["messages"]` instead of a locally rendered prompt; this includes
+the image URL or embedded image bytes.

@@ -1,5 +1,5 @@
 [build-system]
-requires = ["setuptools>=68"]
+requires = ["setuptools>=77"]
 build-backend = "setuptools.build_meta"
 
 [project]
@@ -8,16 +8,18 @@ version = "0.1.0"
 description = "Talk to Shisa DE-1 decision models: typed questions in, typed answers out"
 readme = "README.md"
 requires-python = ">=3.10"
-license = { text = "Apache-2.0" }
+license = "Apache-2.0"
+license-files = ["LICENSE"]
 authors = [{ name = "Shisa AI" }]
 keywords = ["decision-model", "classification", "system-one", "jev", "de-1"]
 classifiers = [
     "Programming Language :: Python :: 3",
-    "License :: OSI Approved :: Apache Software License",
+    "Programming Language :: Python :: 3 :: Only",
 ]
 dependencies = [
     "httpx>=0.27",
-    "transformers>=4.44",
+    "transformers>=5.0",
+    "jinja2>=3.1",
 ]
 
 [project.optional-dependencies]
@@ -28,6 +30,9 @@ shisa-de = "shisa_de.cli:main"
 
 [project.urls]
 Homepage = "https://github.com/shisa-ai/shisa-de"
+Repository = "https://github.com/shisa-ai/shisa-de"
+Issues = "https://github.com/shisa-ai/shisa-de/issues"
+Platform = "https://platform.shisa.ai/"
 Model = "https://huggingface.co/shisa-ai/shisa-de-1"
 
 [tool.setuptools.packages.find]

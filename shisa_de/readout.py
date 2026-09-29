@@ -13,6 +13,18 @@ The readout makes one vLLM request per question:
    costs one more request, ``prompt + letter`` with ``prompt_logprobs: 0``.
 4. Softmax over the letters. The argmax is the answer.
 
+The image readout is the same read of the same slots over a different request.
+An image cannot travel through the text path: only the server can expand an
+image placeholder into image tokens, so `Readout.read_image` posts messages to
+``/v1/chat/completions`` and lets the server render the prompt. Two things
+change as a result. The distribution arrives as a list of token objects under
+``choices[0].logprobs.content[0].top_logprobs`` rather than as a map, and the
+boundary check cannot compare against a client-side rendering, so it requires
+the last prompt token to be the generation-prompt terminator instead. There is
+no letter fallback on that path: a letter outside the returned top-k is an
+error rather than an extra request, because appending a letter to a chat
+request does not reproduce the answer boundary.
+
 Nothing here generates text, and nothing outside the option letters is part of
 the answer.
 """
@@ -27,6 +39,7 @@ from typing import Any
 
 import httpx
 
+from .images import validate_image_url
 from .questions import MAX_OPTIONS, Question, QuestionError
 
 LETTERS = "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
@@ -38,9 +51,15 @@ DIRECT_SYSTEM = (
     "Respond with only its uppercase letter, with no explanation or reasoning."
 )
 
+#: The generation-prompt terminator the checkpoint's chat template ends on, so
+#: the answer letter is the token after it. The image readout cannot render the
+#: prompt itself, so it confirms the answer boundary by requiring the server's
+#: last prompt token to be this one.
+ANSWER_PREFIX = "<channel|>"
+
 #: The readout version. Any change to rendering, request shape, or slot handling
 #: must bump this: thresholds fitted against one version do not transfer.
-READOUT_VERSION = "de1-letter-slots-v1"
+READOUT_VERSION = "de1-letter-slots-v2"
 
 
 class ReadoutError(RuntimeError):
@@ -70,6 +89,9 @@ class LetterRead:
     prompt: str | None = None
     top_logprobs: dict[str, float] = field(default_factory=dict)
     elapsed_ms: float = 0.0
+    #: The messages sent for an image read, when ``debug`` asked for them. The
+    #: server renders the prompt on that path, so there is no local `prompt`.
+    messages: list[dict[str, Any]] | None = None
 
     def answer(self) -> str:
         """The letter with the highest probability."""
@@ -164,8 +186,13 @@ class Readout:
 
     # -- rendering ---------------------------------------------------------
 
-    def render(self, state: Any, question: Question) -> str:
-        """Render one question against one state into the prompt the model sees."""
+    def _payload(self, state: Any, question: Question) -> tuple[dict[str, Any], list[tuple[str, Any]]]:
+        """The user JSON object and the option pairs for one question.
+
+        Both readouts send this same object. The text readout renders it into the
+        prompt itself; the image readout sends it as the text part beside the
+        image and lets the server render.
+        """
         question.validate()
         options = question.options()
         payload = {
@@ -176,6 +203,11 @@ class Readout:
                 for index, (_, description) in enumerate(options)
             ],
         }
+        return payload, options
+
+    def render(self, state: Any, question: Question) -> str:
+        """Render one question against one state into the prompt the model sees."""
+        payload, _ = self._payload(state, question)
         tokenizer = self.ensure_tokenizer()
         return tokenizer.apply_chat_template(
             [
@@ -214,17 +246,29 @@ class Readout:
         response.raise_for_status()
         return [entry.get("id") for entry in (response.json().get("data") or [])]
 
-    def _completions(self, body: dict[str, Any]) -> dict[str, Any]:
+    def _post(self, path: str, body: dict[str, Any]) -> dict[str, Any]:
+        """One POST that returns a JSON object, with the readout's error conventions."""
         try:
-            response = self._client.post("/v1/completions", json=body)
+            response = self._client.post(path, json=body)
         except httpx.HTTPError as exc:  # network, timeout, DNS
-            raise ReadoutError(f"request to {self.base_url}/v1/completions failed: {exc}") from exc
+            raise ReadoutError(f"request to {self.base_url}{path} failed: {exc}") from exc
         if response.status_code >= 400:
             detail = response.text[:400]
             raise ReadoutError(
-                f"{self.base_url}/v1/completions returned HTTP {response.status_code}: {detail}"
+                f"{self.base_url}{path} returned HTTP {response.status_code}: {detail}"
             )
-        return response.json()
+        try:
+            data = response.json()
+        except ValueError as exc:
+            raise ReadoutError(f"{self.base_url}{path} did not return JSON: {exc}") from exc
+        if not isinstance(data, dict):
+            raise ReadoutError(
+                f"{self.base_url}{path} returned a {type(data).__name__}, expected a JSON object"
+            )
+        return data
+
+    def _completions(self, body: dict[str, Any]) -> dict[str, Any]:
+        return self._post("/v1/completions", body)
 
     def _letter_logprob(self, prompt: str, slot: Slot) -> tuple[float | None, int | None, int]:
         """One fallback request: read a single letter's logprob at the answer boundary."""
@@ -298,6 +342,191 @@ class Readout:
         read.elapsed_ms = round((time.perf_counter() - started) * 1000, 2)
         return read, options
 
+    # -- the image readout -------------------------------------------------
+
+    def answer_prefix_id(self) -> int:
+        """The token id of the generation-prompt terminator, resolved locally.
+
+        The image readout cannot render the prompt itself, so it confirms the
+        answer position from the server's side instead: the last prompt token
+        must be this token. It has to be exactly one token for that check to
+        mean anything, which is the same single-token requirement the option
+        letters carry.
+        """
+        tokenizer = self.ensure_tokenizer()
+        encoded = tokenizer.encode(ANSWER_PREFIX, add_special_tokens=False)
+        if len(encoded) != 1 or tokenizer.decode(encoded) != ANSWER_PREFIX:
+            raise ReadoutError(
+                f"the generation-prompt terminator {ANSWER_PREFIX!r} is not one token for "
+                f"tokenizer {self.tokenizer_source!r}, so the image readout cannot confirm "
+                "the answer boundary with this tokenizer"
+            )
+        return encoded[0]
+
+    def _messages(self, payload: dict[str, Any], image_url: str) -> list[dict[str, Any]]:
+        """The multimodal messages the server renders: the image, then the JSON."""
+        return [
+            {"role": "system", "content": self.system_prompt},
+            {
+                "role": "user",
+                "content": [
+                    {"type": "image_url", "image_url": {"url": image_url}},
+                    {"type": "text", "text": json.dumps(payload, ensure_ascii=False)},
+                ],
+            },
+        ]
+
+    @staticmethod
+    def _first_choice(data: dict[str, Any]) -> dict[str, Any]:
+        """The first choice of a chat response, or an error naming what arrived."""
+        choices = data.get("choices")
+        if not isinstance(choices, list) or not choices:
+            raise ReadoutError("the chat response carries no choices")
+        choice = choices[0]
+        if not isinstance(choice, dict):
+            raise ReadoutError(
+                f"the chat response's first choice is a {type(choice).__name__}, expected an object"
+            )
+        return choice
+
+    @staticmethod
+    def _content_top_logprobs(choice: dict[str, Any]) -> dict[str, float]:
+        """The answer position's token distribution from a chat response.
+
+        A chat response carries top logprobs as a list of token objects, one per
+        generated token, where the text path carries a map at the same position.
+        """
+        logprobs = choice.get("logprobs")
+        content = logprobs.get("content") if isinstance(logprobs, dict) else None
+        if not isinstance(content, list) or not content:
+            raise ReadoutError(
+                "the chat response carries no logprobs.content, so there is no answer "
+                "distribution to read"
+            )
+        first = content[0]
+        entries = first.get("top_logprobs") if isinstance(first, dict) else None
+        if not isinstance(entries, list) or not entries:
+            raise ReadoutError(
+                "the chat response's logprobs.content[0] carries no top_logprobs, so there is "
+                "no answer distribution to read"
+            )
+        top: dict[str, float] = {}
+        for entry in entries:
+            token = entry.get("token") if isinstance(entry, dict) else None
+            logprob = entry.get("logprob") if isinstance(entry, dict) else None
+            if (not isinstance(token, str) or not isinstance(logprob, (int, float))
+                    or isinstance(logprob, bool) or not math.isfinite(logprob)):
+                raise ReadoutError(
+                    f"the chat response has a malformed top_logprobs entry: {entry!r}"
+                )
+            # First occurrence wins: a repeated token cannot carry two logprobs.
+            top.setdefault(token, float(logprob))
+        return top
+
+    def _check_image_boundary(self, data: dict[str, Any], prefix_id: int) -> None:
+        """Confirm the server read the distribution at the answer boundary.
+
+        `check_boundary` does this for the text path by tokenizing the prompt it
+        rendered itself. The image readout has no local prompt to tokenize, so the
+        substitute is the server's last prompt token: it must be the exact token
+        the local tokenizer resolves the generation-prompt terminator to.
+        """
+        prompt_logprobs = data.get("prompt_logprobs")
+        if not isinstance(prompt_logprobs, list) or not prompt_logprobs:
+            raise ReadoutError(
+                "the chat response carries no root-level prompt_logprobs, so the answer "
+                "boundary cannot be confirmed; the server must return prompt_logprobs"
+            )
+        last = prompt_logprobs[-1]
+        if not isinstance(last, dict) or not last:
+            raise ReadoutError(
+                "the chat response's prompt_logprobs carries no token at the answer boundary"
+            )
+        token_id, entry = next(iter(last.items()))
+        decoded = entry.get("decoded_token") if isinstance(entry, dict) else None
+        if str(token_id) != str(prefix_id) or decoded != ANSWER_PREFIX:
+            raise ReadoutError(
+                f"the last prompt token is {decoded!r} (id {token_id}), not {ANSWER_PREFIX!r} "
+                f"(id {prefix_id}); the distribution was not read at the answer boundary"
+            )
+
+    def read_image(
+        self,
+        state: Any,
+        question: Question,
+        image_url: str,
+        *,
+        top_logprobs: int = 20,
+        debug: bool = False,
+    ) -> LetterRead:
+        """Read one question's option letters with one image attached.
+
+        The image is sent as an ``image_url`` content part and the question as the
+        JSON object `render` would have rendered, because only the server can turn
+        the image into image tokens. `image_url` must already be a URL: a local
+        file name is rejected rather than forwarded, so call `prepare_image` first.
+
+        Unlike `read`, there is no letter fallback. Appending a letter to a chat
+        request does not reproduce the answer boundary, so a letter outside the
+        returned top-k raises `ReadoutError` instead of costing a second request,
+        and an incomplete distribution is never renormalized into an answer.
+        """
+        started = time.perf_counter()
+        image_url = validate_image_url(image_url)
+        if isinstance(top_logprobs, bool) or not isinstance(top_logprobs, int) or top_logprobs < 1:
+            raise ReadoutError(f"top_logprobs must be a positive integer, got {top_logprobs!r}")
+        payload, options = self._payload(state, question)
+        slots = self.slots(len(options))
+        if len(slots) > top_logprobs:
+            raise ReadoutError(
+                f"{len(slots)} options cannot be read from a top-{top_logprobs} distribution: "
+                f"the server returns at most {top_logprobs} tokens, so at least "
+                f"{len(slots) - top_logprobs} option letters would be missing and the image "
+                f"readout has no letter fallback; pass top_logprobs={len(slots)} or higher and "
+                f"serve the model with --max-logprobs {len(slots)} or higher"
+            )
+        prefix_id = self.answer_prefix_id()
+        messages = self._messages(payload, image_url)
+        data = self._post(
+            "/v1/chat/completions",
+            {
+                "model": self.model,
+                "messages": messages,
+                "max_tokens": 1,
+                "temperature": 0,
+                "logprobs": True,
+                "top_logprobs": top_logprobs,
+                "prompt_logprobs": 0,
+                "chat_template_kwargs": {"enable_thinking": False},
+            },
+        )
+        choice = self._first_choice(data)
+        self._check_image_boundary(data, prefix_id)
+        top = self._content_top_logprobs(choice)
+        missing = [slot.letter for slot in slots if slot.token_text not in top]
+        if missing:
+            raise ReadoutError(
+                f"option letters {''.join(missing)} are missing from the returned top "
+                f"{top_logprobs} logprobs and the image readout has no letter fallback; raise "
+                f"the server's --max-logprobs above {top_logprobs} or pass a higher "
+                "top_logprobs"
+            )
+        usage = data.get("usage") if isinstance(data.get("usage"), dict) else {}
+        message = choice.get("message")
+        sampled = message.get("content") if isinstance(message, dict) else None
+        result = LetterRead(
+            logprobs={slot.letter: top[slot.token_text] for slot in slots},
+            probabilities={},
+            requests=1,
+            prompt_tokens=int(usage.get("prompt_tokens") or 0),
+            sampled=sampled if isinstance(sampled, str) else None,
+            top_logprobs=dict(top) if debug else {},
+            messages=messages if debug else None,
+        )
+        result.probabilities = softmax(result.logprobs)
+        result.elapsed_ms = round((time.perf_counter() - started) * 1000, 2)
+        return result
+
 
 def softmax(logprobs: dict[str, float]) -> dict[str, float]:
     """Turn a letter's logprobs into a distribution over the letters.
@@ -314,6 +543,7 @@ def softmax(logprobs: dict[str, float]) -> dict[str, float]:
 
 
 __all__ = [
+    "ANSWER_PREFIX",
     "DIRECT_SYSTEM",
     "LETTERS",
     "READOUT_VERSION",
