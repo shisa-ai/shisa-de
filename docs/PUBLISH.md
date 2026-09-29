@@ -23,7 +23,8 @@ The first successful upload creates the PyPI project.
 
 1. Check `git status -sb` and keep unrelated work out of the release.
 2. Update both version fields: `pyproject.toml` and `shisa_de/__init__.py`.
-3. Run `python -m pytest tests/` and review the README examples.
+3. Add short release notes to `CHANGELOG.md`. Run `python -m pytest tests/`
+   and review the README examples.
 4. Commit the release files, then push the commit and an annotated tag:
 
    ```bash
@@ -44,8 +45,7 @@ The first successful upload creates the PyPI project.
    uvx --refresh --from 'shisa-de==0.1.0' shisa-de --help
    ```
 
-8. Check <https://pypi.org/project/shisa-de/>. After the first release, replace
-   the README's GitHub install command with `python -m pip install shisa-de`.
+8. Check that <https://pypi.org/project/shisa-de/> shows the released version.
 
 PyPI does not allow replacing uploaded distribution files. Release a new
 version for fixes; do not move a published version tag.

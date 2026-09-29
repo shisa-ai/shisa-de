@@ -20,13 +20,14 @@ only the tokenizer; model weights stay on the server.
 
 ## Install
 
-Requires Python 3.10 or newer and Git. Install directly from GitHub:
+Requires Python 3.10 or newer.
 
 ```bash
-python -m pip install "git+https://github.com/shisa-ai/shisa-de.git"
+pip install shisa-de
 ```
 
-The package is not published to PyPI. For development, see [Development](#development).
+For development, see [Development](#development). Release notes are in
+[CHANGELOG.md](CHANGELOG.md).
 
 ## Use the Shisa Platform
 

@@ -15,7 +15,7 @@ from .images import ImageError
 from .questions import MAX_OPTIONS, Choice, Noul, Question, QuestionError, Score
 from .readout import DIRECT_SYSTEM, LETTERS, READOUT_VERSION, LetterRead, Readout, ReadoutError, Slot, softmax
 
-__version__ = "0.1.0"
+__version__ = "0.1.1"
 
 __all__ = [
     "Answer",
