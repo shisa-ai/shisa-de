@@ -1,6 +1,6 @@
 # Changelog
 
-## 0.1.2 (unreleased)
+## 0.1.2
 
 - Serialize lazy tokenizer imports and loads across client instances to prevent
   concurrent first-call initialization races.
