@@ -76,8 +76,13 @@ What must not change casually:
 ### Before Claiming Done
 
 - `python -m pytest tests/` passes.
-- If the change touches the readout, `docs/READOUT.md` matches the code and
-  `READOUT_VERSION` was bumped.
+- `READOUT_VERSION` identifies the answer-producing contract, not the client
+  build or the contents of `readout.py`. Bump it only when rendering, requests,
+  slot handling, or scoring semantics change, and update `docs/READOUT.md` in
+  the same commit. Do not bump it for implementation-only fixes such as locks,
+  lazy initialization, refactoring, or error handling that leave that contract
+  unchanged. Track those changes with the package version. Editing
+  `readout.py` alone is never a reason to bump the readout version.
 - Any number added to a doc was measured, and the doc says when and against
   which serving fingerprint.
 

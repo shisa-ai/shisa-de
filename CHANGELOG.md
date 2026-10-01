@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.1.2 (unreleased)
+
+- Serialize lazy tokenizer imports and loads across client instances to prevent
+  concurrent first-call initialization races.
+- Keep initialized tokenizer access and normal requests outside the lock, and
+  allow initialization to be retried after a failure.
+
 ## 0.1.1
 
 - Use `pip install shisa-de` in the README.

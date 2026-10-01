@@ -9,15 +9,16 @@ client in another language can be written from it.
 
 Measured numbers on this page come from `shisa-ai/shisa-de-1` served by
 `vllm-0.26.0-tp2-c1aff9a1` on 2026-09-25. Those text measurements used
-`de1-letter-slots-v1`. The current readout version is `de1-letter-slots-v3`:
-client tokenizer initialization is serialized across threads and readout
-instances. Rendering, requests, slot handling, scoring, and calibration are
-unchanged from v2. Version v2 added the chat-completions image path described in
-[Image readout](#12-image-readout), without changing text rendering or scoring.
-Re-measure if the serving fingerprint changes; logprobs move slightly between
-serving shapes.
+`de1-letter-slots-v1`. The current readout version is `de1-letter-slots-v2`:
+text rendering and scoring are unchanged; image input adds the chat-completions
+path described in [Image readout](#12-image-readout). Re-measure if the serving
+fingerprint changes; logprobs move slightly between serving shapes.
 
-- Readout version: `de1-letter-slots-v3`
+Readout identity describes the answer-producing contract, not the client build.
+Implementation-only fixes do not change it. Client releases are identified
+separately by `shisa_de.__version__`.
+
+- Readout version: `de1-letter-slots-v2`
 - Maximum options per question: 26
 - Requests per question: 1, plus 1 per option letter outside the returned top-k
 - Answer position: the first generated token
@@ -50,7 +51,8 @@ The Python client loads each readout's tokenizer lazily. A shared lock protects
 the first import and load across readout instances; waiting callers reuse an
 instance's initialized tokenizer. Failed initialization leaves it unset so a
 later call can retry. The lock does not cover normal requests or calls using an
-already initialized tokenizer.
+already initialized tokenizer. A slow tokenizer load delays other cold
+initializations, including those for different readout instances.
 
 ## 2. The request
 
@@ -552,7 +554,7 @@ option distribution.
 
 Each successful image question costs one request. Input usage includes image
 tokens reported by the server. `result.meta["input_type"]` distinguishes
-`"image"` from `"text"`, and `readout_version` is `de1-letter-slots-v3` for both.
+`"image"` from `"text"`, and `readout_version` is `de1-letter-slots-v2` for both.
 Image answers default to `calibrated=False`: the bundled calibration record
 was fitted for the unchanged v1 text path, not images. Explicit
 `calibrated=True` applies the supplied calibration, but does not establish

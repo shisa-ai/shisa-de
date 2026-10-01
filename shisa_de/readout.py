@@ -62,9 +62,11 @@ DIRECT_SYSTEM = (
 #: last prompt token to be this one.
 ANSWER_PREFIX = "<channel|>"
 
-#: The readout version. Any change to rendering, request shape, or slot handling
-#: must bump this: thresholds fitted against one version do not transfer.
-READOUT_VERSION = "de1-letter-slots-v3"
+#: Identity of the answer-producing contract, not the client build. Bump only
+#: for changes to rendering, request shape, slot handling, or scoring semantics;
+#: existing thresholds must then be revalidated. Implementation-only fixes
+#: (such as initialization locking) must retain this version.
+READOUT_VERSION = "de1-letter-slots-v2"
 
 
 class ReadoutError(RuntimeError):
