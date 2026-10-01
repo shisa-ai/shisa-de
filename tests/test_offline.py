@@ -10,6 +10,11 @@ from __future__ import annotations
 import base64
 import json
 import math
+import sys
+from concurrent.futures import ThreadPoolExecutor
+from contextlib import ExitStack
+from threading import Event, Lock
+from types import SimpleNamespace
 
 import httpx
 import pytest
@@ -51,6 +56,113 @@ def top_logprobs(entries: dict[str, float], prompt_tokens: int = 12) -> dict:
         "choices": [{"text": max(entries, key=entries.get), "logprobs": {"top_logprobs": [entries]}}],
         "usage": {"prompt_tokens": prompt_tokens, "completion_tokens": 1},
     }
+
+
+# -- lazy tokenizer initialization --------------------------------------------
+
+@pytest.mark.parametrize("separate_readouts", [False, True])
+def test_tokenizer_initialization_is_serialized(monkeypatch, separate_readouts):
+    import shisa_de.readout as readout_module
+
+    second_attempt = Event()
+
+    class ObservedLock:
+        def __init__(self):
+            self.lock = Lock()
+            self.counter_lock = Lock()
+            self.attempts = 0
+
+        def __enter__(self):
+            with self.counter_lock:
+                self.attempts += 1
+                if self.attempts == 2:
+                    second_attempt.set()
+            self.lock.acquire()
+
+        def __exit__(self, *exc):
+            self.lock.release()
+
+    init_lock = ObservedLock()
+    monkeypatch.setattr(readout_module, "_TOKENIZER_INIT_LOCK", init_lock)
+    calls = []
+
+    def load(source, **kwargs):
+        assert init_lock.lock.locked()
+        # Hold the first load until another caller reaches the shared lock.
+        # No sleeps or assumptions about thread scheduling are needed.
+        assert second_attempt.wait(timeout=5)
+        tokenizer = StubTokenizer()
+        calls.append((source, kwargs, tokenizer))
+        return tokenizer
+
+    monkeypatch.setitem(sys.modules, "transformers", SimpleNamespace(
+        AutoTokenizer=SimpleNamespace(from_pretrained=load),
+    ))
+    with ExitStack() as stack:
+        first = stack.enter_context(Readout("http://test.local", "test-model"))
+        second = (stack.enter_context(Readout("http://test.local", "other-model"))
+                  if separate_readouts else first)
+        assert first._tokenizer is None
+        assert second._tokenizer is None
+        with ThreadPoolExecutor(max_workers=2) as pool:
+            futures = [pool.submit(readout.ensure_tokenizer) for readout in (first, second)]
+            results = [future.result(timeout=10) for future in futures]
+        assert len(calls) == (2 if separate_readouts else 1)
+        assert results[0] is first._tokenizer
+        assert results[1] is second._tokenizer
+        assert (results[0] is results[1]) is not separate_readouts
+        assert first.ensure_tokenizer() is results[0]
+        assert second.ensure_tokenizer() is results[1]
+        assert init_lock.attempts == 2  # Cached calls do not acquire the lock.
+
+
+def test_tokenizer_initialization_retries_after_failure(monkeypatch):
+    calls = []
+    tokenizer = StubTokenizer()
+
+    def load(source, **kwargs):
+        calls.append((source, kwargs))
+        if len(calls) == 1:
+            raise OSError("tokenizer unavailable")
+        return tokenizer
+
+    monkeypatch.setitem(sys.modules, "transformers", SimpleNamespace(
+        AutoTokenizer=SimpleNamespace(from_pretrained=load),
+    ))
+    with Readout("http://test.local", "test-model", tokenizer="custom-tokenizer",
+                 tokenizer_revision="revision", local_files_only=True) as readout:
+        assert calls == []
+        with pytest.raises(OSError, match="tokenizer unavailable"):
+            readout.ensure_tokenizer()
+        assert readout._tokenizer is None
+        assert readout.ensure_tokenizer() is tokenizer
+        assert readout.ensure_tokenizer() is tokenizer
+    assert calls == [("custom-tokenizer", {"revision": "revision", "local_files_only": True})] * 2
+
+
+@pytest.mark.parametrize("method", ["decide", "classify"])
+def test_multi_question_first_call_loads_tokenizer_once(monkeypatch, method):
+    calls = []
+
+    def load(source, **kwargs):
+        calls.append(source)
+        return StubTokenizer()
+
+    monkeypatch.setitem(sys.modules, "transformers", SimpleNamespace(
+        AutoTokenizer=SimpleNamespace(from_pretrained=load),
+    ))
+    transport = httpx.MockTransport(
+        lambda request: httpx.Response(200, json=top_logprobs({"A": -0.1, "B": -3.0}))
+    )
+    with DecisionModel(transport=transport) as model:
+        result = getattr(model, method)("state", {
+            "route": Choice("Choose a route", {"a": None, "b": None}),
+            "urgent": Noul("Is this urgent?"),
+        })
+        assert result["route"] == "a"
+        assert result["urgent"] > 0.5
+        assert result.usage["requests"] == 2
+    assert len(calls) == 1
 
 
 # -- hosted configuration and health ------------------------------------------

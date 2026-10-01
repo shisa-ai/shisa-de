@@ -35,6 +35,7 @@ import json
 import math
 import time
 from dataclasses import dataclass, field
+from threading import Lock
 from typing import Any
 
 import httpx
@@ -43,6 +44,10 @@ from .images import validate_image_url
 from .questions import MAX_OPTIONS, Question, QuestionError
 
 LETTERS = "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
+
+# Serialize cold imports and loads across Readout instances, not just workers
+# sharing one client. Initialized tokenizers do not acquire this lock.
+_TOKENIZER_INIT_LOCK = Lock()
 
 #: The system line the measured scaffold uses. Changing it changes answers, so
 #: it is part of the readout identity rather than a preference.
@@ -59,7 +64,7 @@ ANSWER_PREFIX = "<channel|>"
 
 #: The readout version. Any change to rendering, request shape, or slot handling
 #: must bump this: thresholds fitted against one version do not transfer.
-READOUT_VERSION = "de1-letter-slots-v2"
+READOUT_VERSION = "de1-letter-slots-v3"
 
 
 class ReadoutError(RuntimeError):
@@ -149,15 +154,18 @@ class Readout:
         """
         if self._tokenizer is not None:
             return self._tokenizer
-        from transformers import AutoTokenizer  # imported lazily: not needed for a stubbed readout
+        with _TOKENIZER_INIT_LOCK:
+            if self._tokenizer is not None:
+                return self._tokenizer
+            from transformers import AutoTokenizer  # imported lazily: not needed for a stubbed readout
 
-        kwargs: dict[str, Any] = {}
-        if self.tokenizer_revision:
-            kwargs["revision"] = self.tokenizer_revision
-        if self.local_files_only:
-            kwargs["local_files_only"] = True
-        self._tokenizer = AutoTokenizer.from_pretrained(self.tokenizer_source, **kwargs)
-        return self._tokenizer
+            kwargs: dict[str, Any] = {}
+            if self.tokenizer_revision:
+                kwargs["revision"] = self.tokenizer_revision
+            if self.local_files_only:
+                kwargs["local_files_only"] = True
+            self._tokenizer = AutoTokenizer.from_pretrained(self.tokenizer_source, **kwargs)
+            return self._tokenizer
 
     def slot(self, letter: str) -> Slot:
         """Resolve one option letter to its token.
