@@ -11,3 +11,7 @@ venv/
 .env.*
 .pi/
 *.ipynb_checkpoints/
+
+# Local stress-test evidence and workflow state are not library artifacts.
+/results/
+/.multiloop/
