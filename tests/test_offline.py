@@ -1189,3 +1189,148 @@ def test_debug_keeps_the_image_messages_out_of_the_default_raw_record():
     assert "top_logprobs" not in plain.raw["color"]
     assert debug.raw["color"]["prompt"] is None  # the server rendered the prompt
     assert debug.raw["color"]["top_logprobs"]["A"] == -0.1
+
+
+# -- text overflow ------------------------------------------------------------
+
+@pytest.mark.parametrize("count", [27, 52, 53, 77, 129, 151, 676])
+def test_overflow_balances_chunks_and_accounts_for_all_reads(count):
+    calls = []
+    def handler(request):
+        body = json.loads(request.content)
+        payload = json.loads(body["prompt"].split("<user>")[1].split("<model>")[0])
+        calls.append(payload)
+        n = len(payload["options"])
+        assert 2 <= n <= 26
+        return httpx.Response(200, json=top_logprobs({chr(65+i): -float(i) for i in range(n)}))
+    with DecisionModel(readout=make_readout(handler)) as model:
+        result = model.decide("state", {"wide": Choice("Which?", {f"k{i}": None for i in range(count)})})
+    answer = result.answers["wide"]
+    blocks = (count + 25) // 26
+    assert len(calls) == blocks + 1
+    sizes = [len(c["options"]) for c in calls[:-1]]
+    assert max(sizes) - min(sizes) <= 1 and sum(sizes) == count
+    assert result.raw["wide"]["strategy"] == "finalist-top1"
+    assert all("prompt" not in c for c in result.raw["wide"]["components"])
+    assert calls[0]["options"][0]["description"] == "k0"
+    assert result["wide"] == "k0"
+    assert len(answer.probabilities) == count
+    assert sum(answer.probabilities.values()) == pytest.approx(1)
+    assert answer.confidence is None and not answer.calibrated
+    assert answer.temperature == 1 and answer.stages == 2
+    assert answer.logical_reads == answer.requests == blocks + 1
+    assert result.usage["input_tokens"] == 12 * (blocks + 1)
+    assert result.usage["output_tokens"] == blocks + 1
+    assert result.meta["calibrated"] is False
+    assert answer.to_dict()["strategy"] == "finalist-top1"
+    assert "confidence" not in answer.to_wire()
+    assert answer.to_wire()["score_semantics"] == "conditional-on-finalists"
+    assert result.to_wire()["answers"]["wide"]["calibrated"] is False
+
+
+@pytest.mark.parametrize("kind", ["strict", "too-wide", "image", "score", "calibration"])
+def test_overflow_rejects_unsupported_shapes_before_any_requests(kind):
+    calls = []
+    def handler(request):
+        calls.append(request)
+        raise AssertionError("unexpected request")
+    with DecisionModel(readout=make_readout(handler), overflow="error" if kind == "strict" else "finalist-top1") as model:
+        q = Choice("Which?", {str(i): None for i in range(677 if kind == "too-wide" else 27)})
+        if kind == "score":
+            q = Score("Level?", list(range(27)))
+        kwargs = {"image": IMAGE_URL} if kind == "image" else {"calibrated": True} if kind == "calibration" else {}
+        with pytest.raises(QuestionError):
+            model.decide("state", {"small": Noul("Yes?"), "wide": q}, **kwargs)
+    assert not calls
+
+
+def test_overflow_ties_keep_order_and_shorthand_marks_conditional_scores():
+    def handler(request):
+        payload = json.loads(json.loads(request.content)["prompt"].split("<user>")[1].split("<model>")[0])
+        return httpx.Response(200, json=top_logprobs({chr(65+i): -1.0 for i in range(len(payload["options"]))}))
+    with DecisionModel(readout=make_readout(handler)) as model:
+        result = model.classify("state", {"wide": [f"k{i}" for i in range(27)], "small": ["yes", "no"]}, include_probabilities=True)
+        raw = model.classify("state", {"wide": [f"k{i}" for i in range(27)], "small": ["yes", "no"]}, calibrated=False)
+    assert raw.meta["calibrated"] is False
+    answer = result.answers["wide"]
+    assert answer.finalists == ["k0", "k14"]
+    assert result["wide"]["label"] == "k0"
+    assert result["wide"]["confidence"] is None
+    assert result["wide"]["score_semantics"] == "conditional-on-finalists"
+    assert result.meta["calibrated"] is None
+    assert result.meta["calibration_by_head"] == {"wide": False, "small": True}
+
+
+def test_overflow_fails_without_partial_answer():
+    calls = []
+    def handler(request):
+        calls.append(request)
+        return httpx.Response(503, text="unavailable")
+    with DecisionModel(readout=make_readout(handler)) as model:
+        with pytest.raises(ReadoutError):
+            model.classify("state", {"wide": list(map(str, range(27)))})
+    assert len(calls) == 1
+
+
+def test_overflow_fallback_accounting_and_incomplete_scores():
+    from shisa_de.overflow import _check_read
+    with pytest.raises(ReadoutError, match="incomplete"):
+        _check_read(LetterRead(logprobs={"A": 0}, probabilities={"A": 1}), 2)
+    calls = []
+    def handler(request):
+        body = json.loads(request.content)
+        calls.append(body)
+        if "prompt_logprobs" in body:
+            letter = body["prompt"][-1]
+            return httpx.Response(200, json={"choices": [{"prompt_logprobs": [None, {str(ord(letter)): {"logprob": -5.0, "rank": 40}}]}], "usage": {"prompt_tokens": 13}})
+        payload = json.loads(body["prompt"].split("<user>")[1].split("<model>")[0])
+        n = len(payload["options"])
+        return httpx.Response(200, json=top_logprobs({chr(65+i): -float(i) for i in range(n-1)}))
+    with DecisionModel(readout=make_readout(handler)) as model:
+        result = model.classify("state", {"wide": list(map(str, range(27)))}, debug=True)
+    assert result.usage["requests"] == 6
+    assert result.usage["logical_reads"] == 3
+    assert result.usage["input_tokens"] == 75
+    assert len(result.answers["wide"].missing_from_top) == 3
+    assert all(c["prompt"] for c in result.raw["wide"]["components"])
+
+
+def test_max_logprobs_is_forwarded_without_changing_default():
+    model = DecisionModel(max_logprobs=40)
+    assert model.readout.max_logprobs == 40
+    model.close()
+    with pytest.raises(ValueError):
+        DecisionModel(max_logprobs=True)
+    with pytest.raises(ValueError):
+        DecisionModel(overflow="truncate")
+
+
+def test_overflow_replays_measured_component_distributions():
+    from pathlib import Path
+    from shisa_de.readout import LETTERS
+    fixture = json.loads((Path(__file__).parent / "fixtures" / "overflow-replay.json").read_text())
+    for case in fixture["cases"]:
+        class Replay:
+            def __init__(self):
+                self.index = 0
+            def evaluate(self, state, question, debug=False):
+                assert state == case["state"]
+                assert question.instructions == case["question"]["instructions"]
+                component = case["components"][self.index]
+                self.index += 1
+                options = question.options()
+                assert [key for key, _ in options] == component["keys"]
+                for key, description in options:
+                    assert description == render_option(key, case["question"]["criteria"][key])
+                return LetterRead(
+                    logprobs={LETTERS[i]: component["logprobs"][key] for i, key in enumerate(component["keys"])},
+                    probabilities={LETTERS[i]: component["probabilities"][key] for i, key in enumerate(component["keys"])},
+                    requests=component["requests"], prompt_tokens=component["prompt_tokens"]), options
+            def close(self):
+                pass
+        replay = Replay()
+        with DecisionModel(readout=replay) as model:
+            result = model.decide(case["state"], {"wide": Choice(case["question"]["instructions"], case["question"]["criteria"])})
+        assert result["wide"] == case["expected"]
+        assert result.answers["wide"].probabilities == case["scores"]
+        assert replay.index == len(case["components"])

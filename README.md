@@ -153,6 +153,40 @@ Other label-set forms:
 | `{"labels": ["a", "b"], "multi_label": True, "cls_threshold": 0.5}` | Ask yes/no for each label; return labels above the threshold |
 | `{"levels": ["low", "medium", "high"]}` | Choose a level on an ordered scale |
 
+## Wide text label sets
+
+Source-checkout feature (not included in PyPI 0.1.2): `DecisionModel` handles
+27–676 text choice options with balanced chunks and a final choice among each
+chunk's winner. Ordinary choices with up to 26 options keep their direct path.
+
+```python
+from shisa_de import Choice, DecisionModel
+
+with DecisionModel(max_logprobs=40) as de:  # requires server support for top-k 40
+    result = de.decide("Route this support request", {
+        "route": Choice("Which queue applies?", {
+            f"queue_{i}": f"Support queue {i}" for i in range(77)
+        }),
+    })
+    answer = result.answers["route"]
+    print(answer.choice, answer.finalists, answer.requests)
+    print(answer.strategy)  # finalist-top1
+```
+
+The returned full-key map contains final-round scores on finalists and zero on
+eliminated options. These scores are **conditional on finalist selection**, not
+calibrated probabilities over all labels. Overflow answers have
+`calibrated=False` and `confidence=None`. Explicit `calibrated=True` is rejected
+for overflow; omit it to keep ordinary text heads calibrated in a mixed call.
+`include_probabilities=True` also exposes the strategy and score semantics for
+wide `classify` heads.
+
+Use `DecisionModel(overflow="error")` for strict rejection above 26. Image and
+ordered-score overflow are unsupported. Live quality testing covered up to
+151 options; 676 is a tested structural limit, not a quality guarantee. Option
+order can change the answer. See the [overflow contract](docs/READOUT.md#13-text-choice-overflow)
+for the algorithm, cost, provenance and held-out evidence.
+
 ## Classify images
 
 Pass a local image path, an HTTP(S) image URL, or a base64 image data URL as

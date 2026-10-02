@@ -26,7 +26,8 @@ Two layers, one contract:
 - `shisa_de/readout.py` — the raw readout. Render a prompt, send one request,
   read the option letters, fall back for letters outside the top-k, softmax.
 - `shisa_de/client.py` — the friendly layer. `classify` for label sets,
-  `decide` for typed questions, both one request per question.
+  `decide` for typed questions. Text choice overflow uses `shisa_de/overflow.py`
+  above the unchanged per-prompt readout.
 
 What must not change casually:
 
@@ -48,6 +49,7 @@ What must not change casually:
 | `README.md` | The API surface users see first; links to the readout page |
 | `shisa_de/readout.py` | Rendering, slot resolution, boundary check, requests, fallback, softmax |
 | `shisa_de/client.py` | `DecisionModel.classify`, `DecisionModel.decide`, `Decision`, `Answer` |
+| `shisa_de/overflow.py` | Balanced chunks, top-one finalists, conditional score maps; text choices only |
 | `shisa_de/questions.py` | `Noul`, `Choice`, `Score` and their wire shapes |
 | `shisa_de/calibration.py` | Temperature scaling and the confidence statistic |
 | `shisa_de/data/calibration.json` | Fitted temperatures with their provenance |

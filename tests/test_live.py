@@ -34,6 +34,19 @@ def model():
         yield de1
 
 
+def test_text_choice_overflow_returns_conditional_scores(model):
+    criteria = {f"label_{i}": f"Category number {i}" for i in range(27)}
+    result = model.decide({"category": 7}, {"wide": Choice("Which category number is stated?", criteria)})
+    answer = result.answers["wide"]
+    assert answer.choice in criteria
+    assert set(answer.probabilities) == set(criteria)
+    assert sum(answer.probabilities.values()) == pytest.approx(1)
+    assert answer.strategy == "finalist-top1"
+    assert answer.confidence is None and not answer.calibrated
+    assert answer.logical_reads == 3 and answer.requests >= 3
+    assert result.to_wire()["answers"]["wide"]["score_semantics"] == "conditional-on-finalists"
+
+
 def test_health_reports_the_endpoint_and_passes_the_boundary_check(model):
     report = model.health()
     assert report["models_status"] == 200, report

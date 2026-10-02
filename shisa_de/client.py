@@ -7,9 +7,9 @@ Two entry points, both on `DecisionModel`:
 - `decide(state, {"route": Choice(...), "urgent": Noul(...)})` is the full
   System One call, with the three question types and their typed answers.
 
-Both send one question per request, because that is DE-1's contract. Heads and
-labels run concurrently over a small thread pool, and every answer records what
-it cost.
+Questions run concurrently over a bounded head pool. Text choices above 26
+options use balanced chunks and a final choice among chunk winners. Every
+answer records its strategy and cost.
 """
 
 from __future__ import annotations
@@ -25,7 +25,8 @@ import httpx
 
 from .calibration import Calibration, confidence as wire_confidence, load_calibration, temper_binary, temper_distribution
 from .images import prepare_image
-from .questions import Choice, Noul, Question, QuestionError, Score
+from .questions import MAX_OPTIONS, Choice, Noul, Question, QuestionError, Score
+from .overflow import OVERFLOW_STRATEGY, OverflowRead, read_overflow, validate_overflow
 from .readout import LETTERS, READOUT_VERSION, LetterRead, Readout, ReadoutError
 
 DEFAULT_ENDPOINT = "https://api.shisa.ai/openai"
@@ -44,7 +45,12 @@ class Answer:
     requests: int = 1
     missing_from_top: list[str] = field(default_factory=list)
     probabilities: dict[str, float] = field(default_factory=dict)
-    confidence: float = 0.0
+    confidence: float | None = 0.0
+    strategy: str = "direct"
+    score_semantics: str = "option-softmax"
+    stages: int = 1
+    logical_reads: int = 1
+    finalists: list[str] | None = None
     choice: str | None = None
     noul: float | None = None
     score: float | None = None
@@ -83,12 +89,17 @@ class Answer:
                 "probabilities": self.probabilities,
                 "confidence": self.confidence,
             }
-        return {
+        out = {
             "type": "choice",
             "choice": self.choice,
             "probabilities": self.probabilities,
-            "confidence": self.confidence,
         }
+        if self.confidence is not None:
+            out["confidence"] = self.confidence
+        if self.strategy != "direct":
+            out.update(strategy=self.strategy, score_semantics=self.score_semantics,
+                       calibrated=False)
+        return out
 
     def to_dict(self) -> dict[str, Any]:
         """Everything, including the fields TypeSafe does not return."""
@@ -97,6 +108,10 @@ class Answer:
                                "temperature": self.temperature, "requests": self.requests}
         if self.missing_from_top:
             out["missing_from_top"] = self.missing_from_top
+        out.update(strategy=self.strategy, score_semantics=self.score_semantics,
+                   stages=self.stages, logical_reads=self.logical_reads)
+        if self.finalists is not None:
+            out["finalists"] = list(self.finalists)
         return out
 
 
@@ -250,6 +265,8 @@ class DecisionModel:
         timeout: float = 120.0,
         max_workers: int = 8,
         image_top_logprobs: int = 20,
+        max_logprobs: int = 20,
+        overflow: str = OVERFLOW_STRATEGY,
         calibration: Calibration | None = None,
         transport: httpx.BaseTransport | None = None,
         readout: Readout | None = None,
@@ -260,6 +277,11 @@ class DecisionModel:
         self.model = model or DEFAULT_MODEL
         self.calibration = calibration if calibration is not None else load_calibration()
         self.max_workers = max(1, int(max_workers))
+        if overflow not in (OVERFLOW_STRATEGY, "error"):
+            raise ValueError("overflow must be 'finalist-top1' or 'error'")
+        self.overflow = overflow
+        if isinstance(max_logprobs, bool) or not isinstance(max_logprobs, int) or max_logprobs < 1:
+            raise ValueError("max_logprobs must be a positive integer")
         if isinstance(image_top_logprobs, bool) or not isinstance(image_top_logprobs, int) or image_top_logprobs < 1:
             raise ValueError("image_top_logprobs must be a positive integer")
         self.image_top_logprobs = image_top_logprobs
@@ -273,6 +295,7 @@ class DecisionModel:
                 tokenizer_revision=tokenizer_revision,
                 local_files_only=local_files_only,
                 timeout=timeout,
+                max_logprobs=max_logprobs,
                 api_key=api_key if api_key is not None else _api_key_from_env(),
                 transport=transport,
             )
@@ -353,7 +376,9 @@ class DecisionModel:
         once, or a question object for full control.
 
         ``image`` attaches a local file, HTTP(S) URL, or image data URL.
-        Calibration defaults to enabled for text and disabled for images.
+        Calibration defaults to enabled for direct text and disabled for images.
+        Wide text choices use uncalibrated finalist scores; explicit
+        ``calibrated=True`` is rejected for those heads.
 
         Returns a `Decision`: ``result["intent"]`` is the chosen label, and
         ``result.answers["intent"]`` carries the distribution behind it.
@@ -391,6 +416,9 @@ class DecisionModel:
                 decision[head] = {"label": answer.label, "confidence": answer.confidence}
             else:
                 decision[head] = answer.label
+            if answer.strategy != "direct" and (include_probabilities or include_confidence):
+                decision[head].update(strategy=answer.strategy, score_semantics=answer.score_semantics,
+                                      calibrated=False)
         return decision
 
     # -- the full call -----------------------------------------------------
@@ -410,7 +438,9 @@ class DecisionModel:
         to the label-set shorthand `classify` accepts. The dict view returns
         each answer's primary value; ``result.answers`` returns the full answer.
         ``image`` attaches a local file, HTTP(S) URL, or image data URL.
-        Calibration defaults to enabled for text and disabled for images.
+        Calibration defaults to enabled for direct text and disabled for images.
+        Wide text choices return uncalibrated finalist scores and reject
+        explicit ``calibrated=True``.
         """
         parsed = {head: _question_from_head(head, spec)[0] for head, spec in questions.items()}
         decision = self._run(state, parsed, image=image, calibrated=calibrated, debug=debug)
@@ -433,6 +463,7 @@ class DecisionModel:
     ) -> Decision:
         started = time.perf_counter()
         image_url = prepare_image(image) if image is not None else None
+        requested_calibration = calibrated
         if calibrated is None:
             calibrated = image_url is None
         decision = Decision()
@@ -443,8 +474,26 @@ class DecisionModel:
             else:
                 work.append((head, question))
 
-        def run(item: tuple[str, Question]) -> tuple[str, Question, LetterRead, list[tuple[str, Any]]]:
+        # Validate every head before issuing any requests. The raw readout's
+        # per-prompt validation remains capped at MAX_OPTIONS.
+        overflow_heads = set()
+        for head, question in work:
+            if isinstance(question, Choice) and len(question.options()) > MAX_OPTIONS:
+                if self.overflow == "error":
+                    raise QuestionError(f"head {head!r}: overflow='error' rejects choices above {MAX_OPTIONS} options")
+                if image_url is not None:
+                    raise QuestionError("image choice overflow is not supported")
+                if requested_calibration is True:
+                    raise QuestionError("overflow scores are uncalibrated; omit calibrated or pass calibrated=False")
+                validate_overflow(question)
+                overflow_heads.add(head)
+            else:
+                question.validate()
+
+        def run(item: tuple[str, Question]) -> tuple[str, Question, LetterRead | OverflowRead, list[tuple[str, Any]]]:
             head, question = item
+            if head in overflow_heads:
+                return head, question, read_overflow(self.readout, state, question, debug=debug), question.options()
             if image_url is None:
                 read, options = self.readout.evaluate(state, question, debug=debug)
             else:
@@ -462,7 +511,22 @@ class DecisionModel:
 
         input_tokens = 0
         requests = 0
+        logical_reads = 0
         for head, question, read, options in results:
+            if isinstance(read, OverflowRead):
+                answer = Answer(type="choice", probabilities=read.probabilities,
+                                choice=max(read.probabilities, key=read.probabilities.get),
+                                confidence=None, calibrated=False, temperature=1.0,
+                                requests=read.requests, missing_from_top=read.missing_from_top,
+                                strategy=OVERFLOW_STRATEGY, score_semantics="conditional-on-finalists",
+                                stages=2, logical_reads=read.logical_reads, finalists=read.finalists)
+                decision.answers[head] = answer
+                decision.raw[head] = read.raw(debug)
+                input_tokens += read.prompt_tokens
+                requests += read.requests
+                logical_reads += read.logical_reads
+                continue
+            logical_reads += 1
             answer = _answer_from_read(question, read, options, self.calibration, calibrated)
             decision.answers[head] = answer
             decision.raw[head] = {
@@ -484,7 +548,8 @@ class DecisionModel:
             requests += read.requests
         decision.usage = {
             "input_tokens": input_tokens,
-            "output_tokens": len(work),
+            "output_tokens": logical_reads,
+            "logical_reads": logical_reads,
             "requests": requests,
             "wall_ms": round((time.perf_counter() - started) * 1000, 2),
         }
@@ -494,7 +559,11 @@ class DecisionModel:
             "readout_version": READOUT_VERSION,
             "input_type": "image" if image_url is not None else "text",
             "calibration": self.calibration.id,
-            "calibrated": calibrated,
+            "calibrated": ((next(iter({a.calibrated for a in decision.answers.values()}))
+                            if len({a.calibrated for a in decision.answers.values()}) == 1 else None)
+                           if overflow_heads else calibrated),
+            "calibration_by_head": {head: answer.calibrated for head, answer in decision.answers.items()},
+            "strategy_by_head": {head: answer.strategy for head, answer in decision.answers.items()},
         }
         return decision
 

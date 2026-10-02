@@ -1,0 +1,5280 @@
+{
+  "source": "research-jev-universal-classifiers commit ef18e24, held-out.jsonl",
+  "source_sha256": "76cebcffe62f22b80bb6a5508b4ff82d06b0c92e140688073ae92035ee68ca76",
+  "measured_date": "2026-10-02",
+  "fingerprint": "vllm-0.26.0-tp2-ae644bcc",
+  "cases": [
+    {
+      "id": "CLINC150+OOS:test:2067",
+      "state": {},
+      "question": {
+        "type": "choice",
+        "instructions": "Classify the intent of this user request, or choose out of scope if none applies:\nhow long does it take to make mashed potatoes",
+        "criteria": {
+          "option_0": "accept reservations",
+          "option_1": "account blocked",
+          "option_2": "alarm",
+          "option_3": "application status",
+          "option_4": "apr",
+          "option_5": "are you a bot",
+          "option_6": "balance",
+          "option_7": "bill balance",
+          "option_8": "bill due",
+          "option_9": "book flight",
+          "option_10": "book hotel",
+          "option_11": "calculator",
+          "option_12": "calendar",
+          "option_13": "calendar update",
+          "option_14": "calories",
+          "option_15": "cancel",
+          "option_16": "cancel reservation",
+          "option_17": "car rental",
+          "option_18": "card declined",
+          "option_19": "carry on",
+          "option_20": "change accent",
+          "option_21": "change ai name",
+          "option_22": "change language",
+          "option_23": "change speed",
+          "option_24": "change user name",
+          "option_25": "change volume",
+          "option_26": "confirm reservation",
+          "option_27": "cook time",
+          "option_28": "credit limit",
+          "option_29": "credit limit change",
+          "option_30": "credit score",
+          "option_31": "current location",
+          "option_32": "damaged card",
+          "option_33": "date",
+          "option_34": "definition",
+          "option_35": "direct deposit",
+          "option_36": "directions",
+          "option_37": "distance",
+          "option_38": "do you have pets",
+          "option_39": "exchange rate",
+          "option_40": "expiration date",
+          "option_41": "find phone",
+          "option_42": "flight status",
+          "option_43": "flip coin",
+          "option_44": "food last",
+          "option_45": "freeze account",
+          "option_46": "fun fact",
+          "option_47": "gas",
+          "option_48": "gas type",
+          "option_49": "goodbye",
+          "option_50": "greeting",
+          "option_51": "how busy",
+          "option_52": "how old are you",
+          "option_53": "improve credit score",
+          "option_54": "income",
+          "option_55": "ingredient substitution",
+          "option_56": "ingredients list",
+          "option_57": "insurance",
+          "option_58": "insurance change",
+          "option_59": "interest rate",
+          "option_60": "international fees",
+          "option_61": "international visa",
+          "option_62": "jump start",
+          "option_63": "last maintenance",
+          "option_64": "lost luggage",
+          "option_65": "make call",
+          "option_66": "maybe",
+          "option_67": "meal suggestion",
+          "option_68": "meaning of life",
+          "option_69": "measurement conversion",
+          "option_70": "meeting schedule",
+          "option_71": "min payment",
+          "option_72": "mpg",
+          "option_73": "new card",
+          "option_74": "next holiday",
+          "option_75": "next song",
+          "option_76": "no",
+          "option_77": "nutrition info",
+          "option_78": "oil change how",
+          "option_79": "oil change when",
+          "option_80": "out of scope: none of the listed intents",
+          "option_81": "order",
+          "option_82": "order checks",
+          "option_83": "order status",
+          "option_84": "pay bill",
+          "option_85": "payday",
+          "option_86": "pin change",
+          "option_87": "play music",
+          "option_88": "plug type",
+          "option_89": "pto balance",
+          "option_90": "pto request",
+          "option_91": "pto request status",
+          "option_92": "pto used",
+          "option_93": "recipe",
+          "option_94": "redeem rewards",
+          "option_95": "reminder",
+          "option_96": "reminder update",
+          "option_97": "repeat",
+          "option_98": "replacement card duration",
+          "option_99": "report fraud",
+          "option_100": "report lost card",
+          "option_101": "reset settings",
+          "option_102": "restaurant reservation",
+          "option_103": "restaurant reviews",
+          "option_104": "restaurant suggestion",
+          "option_105": "rewards balance",
+          "option_106": "roll dice",
+          "option_107": "rollover 401k",
+          "option_108": "routing",
+          "option_109": "schedule maintenance",
+          "option_110": "schedule meeting",
+          "option_111": "share location",
+          "option_112": "shopping list",
+          "option_113": "shopping list update",
+          "option_114": "smart home",
+          "option_115": "spelling",
+          "option_116": "spending history",
+          "option_117": "sync device",
+          "option_118": "taxes",
+          "option_119": "tell joke",
+          "option_120": "text",
+          "option_121": "thank you",
+          "option_122": "time",
+          "option_123": "timer",
+          "option_124": "timezone",
+          "option_125": "tire change",
+          "option_126": "tire pressure",
+          "option_127": "todo list",
+          "option_128": "todo list update",
+          "option_129": "traffic",
+          "option_130": "transactions",
+          "option_131": "transfer",
+          "option_132": "translate",
+          "option_133": "travel alert",
+          "option_134": "travel notification",
+          "option_135": "travel suggestion",
+          "option_136": "uber",
+          "option_137": "update playlist",
+          "option_138": "user name",
+          "option_139": "vaccines",
+          "option_140": "w2",
+          "option_141": "weather",
+          "option_142": "what are your hobbies",
+          "option_143": "what can i ask you",
+          "option_144": "what is your name",
+          "option_145": "what song",
+          "option_146": "where are you from",
+          "option_147": "whisper mode",
+          "option_148": "who do you work for",
+          "option_149": "who made you",
+          "option_150": "yes"
+        }
+      },
+      "components": [
+        {
+          "keys": [
+            "option_0",
+            "option_1",
+            "option_2",
+            "option_3",
+            "option_4",
+            "option_5",
+            "option_6",
+            "option_7",
+            "option_8",
+            "option_9",
+            "option_10",
+            "option_11",
+            "option_12",
+            "option_13",
+            "option_14",
+            "option_15",
+            "option_16",
+            "option_17",
+            "option_18",
+            "option_19",
+            "option_20",
+            "option_21",
+            "option_22",
+            "option_23",
+            "option_24",
+            "option_25"
+          ],
+          "logprobs": {
+            "option_0": -5.83733606338501,
+            "option_1": -5.08733606338501,
+            "option_2": -6.58733606338501,
+            "option_3": -4.96233606338501,
+            "option_4": -4.33733606338501,
+            "option_5": -5.08733606338501,
+            "option_6": -6.08733606338501,
+            "option_7": -3.712336301803589,
+            "option_8": -4.96233606338501,
+            "option_9": -6.08733606338501,
+            "option_10": -5.58733606338501,
+            "option_11": -1.5873361825942993,
+            "option_12": -5.96233606338501,
+            "option_13": -4.96233606338501,
+            "option_14": -0.4623362123966217,
+            "option_15": -5.83733606338501,
+            "option_16": -5.83733606338501,
+            "option_17": -6.46233606338501,
+            "option_18": -5.21233606338501,
+            "option_19": -7.33733606338501,
+            "option_20": -5.46233606338501,
+            "option_21": -7.71233606338501,
+            "option_22": -5.71233606338501,
+            "option_23": -4.21233606338501,
+            "option_24": -7.08733606338501,
+            "option_25": -4.58733606338501
+          },
+          "probabilities": {
+            "option_0": 0.0030143148830208723,
+            "option_1": 0.006381304657431019,
+            "option_2": 0.0014238615301685046,
+            "option_3": 0.007230965501116094,
+            "option_4": 0.013509222065792007,
+            "option_5": 0.006381304657431019,
+            "option_6": 0.0023475507913204457,
+            "option_7": 0.025238543495131698,
+            "option_8": 0.007230965501116094,
+            "option_9": 0.0023475507913204457,
+            "option_10": 0.0038704569236989368,
+            "option_11": 0.2113197626256562,
+            "option_12": 0.002660123547680567,
+            "option_13": 0.007230965501116094,
+            "option_14": 0.6509106739502549,
+            "option_15": 0.0030143148830208723,
+            "option_16": 0.0030143148830208723,
+            "option_17": 0.0016134464902918051,
+            "option_18": 0.005631481594631527,
+            "option_19": 0.0006725845625862427,
+            "option_20": 0.004385802275751237,
+            "option_21": 0.0004622601589458403,
+            "option_22": 0.003415666246751413,
+            "option_23": 0.015307954085988448,
+            "option_24": 0.0008636156732325427,
+            "option_25": 0.010520992723524315
+          },
+          "prompt_sha256": "84ee1133c4fb16f7c1a637fb7789a4573f6ef897ea3e281f2cb0e8c3099efba7",
+          "prompt_tokens": 422,
+          "requests": 1,
+          "missing_from_top": [],
+          "ranks": {},
+          "sampled": "O",
+          "elapsed_ms": 0.0
+        },
+        {
+          "keys": [
+            "option_26",
+            "option_27",
+            "option_28",
+            "option_29",
+            "option_30",
+            "option_31",
+            "option_32",
+            "option_33",
+            "option_34",
+            "option_35",
+            "option_36",
+            "option_37",
+            "option_38",
+            "option_39",
+            "option_40",
+            "option_41",
+            "option_42",
+            "option_43",
+            "option_44",
+            "option_45",
+            "option_46",
+            "option_47",
+            "option_48",
+            "option_49",
+            "option_50"
+          ],
+          "logprobs": {
+            "option_26": -6.895229816436768,
+            "option_27": -0.020229684188961983,
+            "option_28": -8.52022933959961,
+            "option_29": -7.270229816436768,
+            "option_30": -7.770229816436768,
+            "option_31": -9.27022933959961,
+            "option_32": -7.895229816436768,
+            "option_33": -6.270229816436768,
+            "option_34": -6.395229816436768,
+            "option_35": -9.02022933959961,
+            "option_36": -7.895229816436768,
+            "option_37": -8.27022933959961,
+            "option_38": -9.39522933959961,
+            "option_39": -8.77022933959961,
+            "option_40": -8.27022933959961,
+            "option_41": -8.39522933959961,
+            "option_42": -8.14522933959961,
+            "option_43": -9.39522933959961,
+            "option_44": -4.770229816436768,
+            "option_45": -10.02022933959961,
+            "option_46": -6.770229816436768,
+            "option_47": -10.14522933959961,
+            "option_48": -8.64522933959961,
+            "option_49": -8.27022933959961,
+            "option_50": -10.14522933959961
+          },
+          "probabilities": {
+            "option_26": 0.0010142721118036164,
+            "option_27": 0.9815876936158967,
+            "option_28": 0.00019972211588304914,
+            "option_29": 0.0006970983482193038,
+            "option_30": 0.0004228115210300414,
+            "option_31": 9.43420473858174e-05,
+            "option_32": 0.0003731298576860931,
+            "option_33": 0.0018949097726133491,
+            "option_34": 0.0016722520050085608,
+            "option_35": 0.00012113758670574883,
+            "option_36": 0.0003731298576860931,
+            "option_37": 0.0002564482730684896,
+            "option_38": 8.325656460147297e-05,
+            "option_39": 0.00015554374024639655,
+            "option_40": 0.0002564482730684896,
+            "option_41": 0.0002263148066561106,
+            "option_42": 0.00029059396391921806,
+            "option_43": 8.325656460147297e-05,
+            "option_44": 0.008492396417198036,
+            "option_45": 4.4564027702168015e-05,
+            "option_46": 0.001149320874479091,
+            "option_47": 3.932761641385738e-05,
+            "option_48": 0.00017625414864443252,
+            "option_49": 0.0002564482730684896,
+            "option_50": 3.932761641385738e-05
+          },
+          "prompt_sha256": "ddb0df614c827bb43c7b07f90672411d59a91c5585bf3e2aea55bfbfcfae9cba",
+          "prompt_tokens": 409,
+          "requests": 1,
+          "missing_from_top": [],
+          "ranks": {},
+          "sampled": "B",
+          "elapsed_ms": 0.0
+        },
+        {
+          "keys": [
+            "option_51",
+            "option_52",
+            "option_53",
+            "option_54",
+            "option_55",
+            "option_56",
+            "option_57",
+            "option_58",
+            "option_59",
+            "option_60",
+            "option_61",
+            "option_62",
+            "option_63",
+            "option_64",
+            "option_65",
+            "option_66",
+            "option_67",
+            "option_68",
+            "option_69",
+            "option_70",
+            "option_71",
+            "option_72",
+            "option_73",
+            "option_74",
+            "option_75"
+          ],
+          "logprobs": {
+            "option_51": -4.819685459136963,
+            "option_52": -5.569685459136963,
+            "option_53": -7.819685459136963,
+            "option_54": -5.819685459136963,
+            "option_55": -3.819685459136963,
+            "option_56": -6.069685459136963,
+            "option_57": -6.569685459136963,
+            "option_58": -4.444685459136963,
+            "option_59": -6.319685459136963,
+            "option_60": -6.319685459136963,
+            "option_61": -6.194685459136963,
+            "option_62": -6.319685459136963,
+            "option_63": -7.444685459136963,
+            "option_64": -6.444685459136963,
+            "option_65": -3.819685459136963,
+            "option_66": -2.694685459136963,
+            "option_67": -0.1946854293346405,
+            "option_68": -6.069685459136963,
+            "option_69": -4.944685459136963,
+            "option_70": -8.194684982299805,
+            "option_71": -6.569685459136963,
+            "option_72": -9.319684982299805,
+            "option_73": -7.569685459136963,
+            "option_74": -5.319685459136963,
+            "option_75": -8.194684982299805
+          },
+          "probabilities": {
+            "option_51": 0.008136570617531482,
+            "option_52": 0.003843443813737175,
+            "option_53": 0.00040509599761499274,
+            "option_54": 0.002993277051829458,
+            "option_55": 0.022117492055609617,
+            "option_56": 0.0023311665119144483,
+            "option_57": 0.001413923962371469,
+            "option_58": 0.011838640392943021,
+            "option_59": 0.0018155143049488078,
+            "option_60": 0.0018155143049488078,
+            "option_61": 0.002057247226173436,
+            "option_62": 0.0018155143049488078,
+            "option_63": 0.0005894111986260099,
+            "option_64": 0.0016021857507153474,
+            "option_65": 0.022117492055609617,
+            "option_66": 0.06812667168549943,
+            "option_67": 0.8299527911059456,
+            "option_68": 0.0023311665119144483,
+            "option_69": 0.00718049836763236,
+            "option_70": 0.0002784182688020622,
+            "option_71": 0.001413923962371469,
+            "option_72": 9.038917792422974e-05,
+            "option_73": 0.0005201535571361275,
+            "option_74": 0.004935079544449798,
+            "option_75": 0.0002784182688020622
+          },
+          "prompt_sha256": "c94950614cf2996aff7f56d2707d09ccebd00abf47e94ba50cc451f147068ee5",
+          "prompt_tokens": 412,
+          "requests": 1,
+          "missing_from_top": [],
+          "ranks": {},
+          "sampled": "Q",
+          "elapsed_ms": 0.0
+        },
+        {
+          "keys": [
+            "option_76",
+            "option_77",
+            "option_78",
+            "option_79",
+            "option_80",
+            "option_81",
+            "option_82",
+            "option_83",
+            "option_84",
+            "option_85",
+            "option_86",
+            "option_87",
+            "option_88",
+            "option_89",
+            "option_90",
+            "option_91",
+            "option_92",
+            "option_93",
+            "option_94",
+            "option_95",
+            "option_96",
+            "option_97",
+            "option_98",
+            "option_99",
+            "option_100"
+          ],
+          "logprobs": {
+            "option_76": -5.464458465576172,
+            "option_77": -6.464458465576172,
+            "option_78": -9.714458465576172,
+            "option_79": -7.464458465576172,
+            "option_80": -0.8394585847854614,
+            "option_81": -9.089458465576172,
+            "option_82": -8.464458465576172,
+            "option_83": -5.714458465576172,
+            "option_84": -8.839458465576172,
+            "option_85": -8.714458465576172,
+            "option_86": -8.339458465576172,
+            "option_87": -8.089458465576172,
+            "option_88": -8.464458465576172,
+            "option_89": -9.089458465576172,
+            "option_90": -9.464458465576172,
+            "option_91": -9.214458465576172,
+            "option_92": -9.714458465576172,
+            "option_93": -0.5894585847854614,
+            "option_94": -8.464458465576172,
+            "option_95": -9.214458465576172,
+            "option_96": -9.339458465576172,
+            "option_97": -9.714458465576172,
+            "option_98": -8.589458465576172,
+            "option_99": -7.589458465576172,
+            "option_100": -10.589458465576172
+          },
+          "probabilities": {
+            "option_76": 0.0042379770593501875,
+            "option_77": 0.0015590646322911393,
+            "option_78": 6.0451496075543885e-05,
+            "option_79": 0.0005735478256774245,
+            "option_80": 0.43228536078215024,
+            "option_81": 0.00011293826316386473,
+            "option_82": 0.00021099645359530677,
+            "option_83": 0.0033005398524605756,
+            "option_84": 0.0001450156004189712,
+            "option_85": 0.00016432420328531426,
+            "option_86": 0.00023909030499410825,
+            "option_87": 0.00030699802849605903,
+            "option_88": 0.00021099645359530677,
+            "option_89": 0.00011293826316386473,
+            "option_90": 7.762125743779761e-05,
+            "option_91": 9.966766742539454e-05,
+            "option_92": 6.0451496075543885e-05,
+            "option_93": 0.5550653905063111,
+            "option_94": 0.00021099645359530677,
+            "option_95": 9.966766742539454e-05,
+            "option_96": 8.795640779074225e-05,
+            "option_97": 6.0451496075543885e-05,
+            "option_98": 0.00018620371675419253,
+            "option_99": 0.0005061541796444566,
+            "option_100": 2.5199932746638652e-05
+          },
+          "prompt_sha256": "e7e78f77c5477ce2a23f3bdd0f5ab61ebce7931ceb73bbb84bf1aa9ccce6e090",
+          "prompt_tokens": 420,
+          "requests": 1,
+          "missing_from_top": [],
+          "ranks": {},
+          "sampled": "R",
+          "elapsed_ms": 0.0
+        },
+        {
+          "keys": [
+            "option_101",
+            "option_102",
+            "option_103",
+            "option_104",
+            "option_105",
+            "option_106",
+            "option_107",
+            "option_108",
+            "option_109",
+            "option_110",
+            "option_111",
+            "option_112",
+            "option_113",
+            "option_114",
+            "option_115",
+            "option_116",
+            "option_117",
+            "option_118",
+            "option_119",
+            "option_120",
+            "option_121",
+            "option_122",
+            "option_123",
+            "option_124",
+            "option_125"
+          ],
+          "logprobs": {
+            "option_101": -6.031074523925781,
+            "option_102": -5.656074523925781,
+            "option_103": -7.281074523925781,
+            "option_104": -5.656074523925781,
+            "option_105": -4.531074523925781,
+            "option_106": -7.031074523925781,
+            "option_107": -6.781074523925781,
+            "option_108": -3.906074285507202,
+            "option_109": -5.781074523925781,
+            "option_110": -6.156074523925781,
+            "option_111": -6.406074523925781,
+            "option_112": -5.531074523925781,
+            "option_113": -7.406074523925781,
+            "option_114": -6.281074523925781,
+            "option_115": -3.656074285507202,
+            "option_116": -6.531074523925781,
+            "option_117": -6.281074523925781,
+            "option_118": -7.281074523925781,
+            "option_119": -4.906074523925781,
+            "option_120": -6.156074523925781,
+            "option_121": -5.656074523925781,
+            "option_122": -3.781074285507202,
+            "option_123": -0.15607436001300812,
+            "option_124": -4.781074523925781,
+            "option_125": -7.531074523925781
+          },
+          "probabilities": {
+            "option_101": 0.0024361011709099854,
+            "option_102": 0.003544506288815376,
+            "option_103": 0.0006979546711024365,
+            "option_104": 0.003544506288815376,
+            "option_105": 0.010917847991905042,
+            "option_106": 0.0008961915373914617,
+            "option_107": 0.001150732712231099,
+            "option_108": 0.020397230237814173,
+            "option_109": 0.0031280158210711885,
+            "option_110": 0.002149851737710768,
+            "option_111": 0.0016743062168165666,
+            "option_112": 0.004016451818056781,
+            "option_113": 0.0006159428353923503,
+            "option_114": 0.0018972374995458625,
+            "option_115": 0.026190562055385145,
+            "option_116": 0.0014775700503187519,
+            "option_117": 0.0018972374995458625,
+            "option_118": 0.0006979546711024365,
+            "option_119": 0.00750371987230588,
+            "option_120": 0.002149851737710768,
+            "option_121": 0.003544506288815376,
+            "option_122": 0.023113089890827023,
+            "option_123": 0.867312234896457,
+            "option_124": 0.008502828565550211,
+            "option_125": 0.0005435676444029224
+          },
+          "prompt_sha256": "6696460354bf8a63d08c827f75ce65b71416715053e4872d7559faca222feb80",
+          "prompt_tokens": 412,
+          "requests": 1,
+          "missing_from_top": [],
+          "ranks": {},
+          "sampled": "W",
+          "elapsed_ms": 0.0
+        },
+        {
+          "keys": [
+            "option_126",
+            "option_127",
+            "option_128",
+            "option_129",
+            "option_130",
+            "option_131",
+            "option_132",
+            "option_133",
+            "option_134",
+            "option_135",
+            "option_136",
+            "option_137",
+            "option_138",
+            "option_139",
+            "option_140",
+            "option_141",
+            "option_142",
+            "option_143",
+            "option_144",
+            "option_145",
+            "option_146",
+            "option_147",
+            "option_148",
+            "option_149",
+            "option_150"
+          ],
+          "logprobs": {
+            "option_126": -5.285608291625977,
+            "option_127": -4.535608291625977,
+            "option_128": -7.410608291625977,
+            "option_129": -5.785608291625977,
+            "option_130": -4.535608291625977,
+            "option_131": -6.785608291625977,
+            "option_132": -6.535608291625977,
+            "option_133": -4.160608291625977,
+            "option_134": -5.910608291625977,
+            "option_135": -5.410608291625977,
+            "option_136": -5.910608291625977,
+            "option_137": -6.535608291625977,
+            "option_138": -7.160608291625977,
+            "option_139": -5.535608291625977,
+            "option_140": -3.9106085300445557,
+            "option_141": -5.910608291625977,
+            "option_142": -4.410608291625977,
+            "option_143": -0.1606084406375885,
+            "option_144": -4.535608291625977,
+            "option_145": -8.535608291625977,
+            "option_146": -6.035608291625977,
+            "option_147": -8.160608291625977,
+            "option_148": -6.410608291625977,
+            "option_149": -4.285608291625977,
+            "option_150": -6.160608291625977
+          },
+          "probabilities": {
+            "option_126": 0.005156521621949027,
+            "option_127": 0.010916356359329707,
+            "option_128": 0.0006158586832408917,
+            "option_129": 0.0031275884611832016,
+            "option_130": 0.010916356359329707,
+            "option_131": 0.0011505754953143273,
+            "option_132": 0.001477368179801684,
+            "option_133": 0.015883204781737527,
+            "option_134": 0.0027600871295534964,
+            "option_135": 0.00455061435948051,
+            "option_136": 0.0027600871295534964,
+            "option_137": 0.001477368179801684,
+            "option_138": 0.0007907782023691497,
+            "option_139": 0.004015903077098533,
+            "option_140": 0.02039443377579475,
+            "option_141": 0.0027600871295534964,
+            "option_142": 0.012369852321700668,
+            "option_143": 0.8671934684585533,
+            "option_144": 0.010916356359329707,
+            "option_145": 0.00019994004105821983,
+            "option_146": 0.0024357683426945676,
+            "option_147": 0.00029091104317812056,
+            "option_148": 0.0016740774675524312,
+            "option_149": 0.0140168790230002,
+            "option_150": 0.002149558017841569
+          },
+          "prompt_sha256": "47458bb2dd3576a4ea3aa6794cda8272e5e2fbd522975ffd0ec23c80d19fa40b",
+          "prompt_tokens": 420,
+          "requests": 1,
+          "missing_from_top": [],
+          "ranks": {},
+          "sampled": "R",
+          "elapsed_ms": 0.0
+        },
+        {
+          "keys": [
+            "option_14",
+            "option_27",
+            "option_67",
+            "option_93",
+            "option_123",
+            "option_143"
+          ],
+          "logprobs": {
+            "option_14": -6.381526470184326,
+            "option_27": -0.006526583340018988,
+            "option_67": -7.631526470184326,
+            "option_93": -6.256526470184326,
+            "option_123": -7.381526470184326,
+            "option_143": -8.881526947021484
+          },
+          "probabilities": {
+            "option_14": 0.0016953319548450715,
+            "option_27": 0.9951350454987822,
+            "option_67": 0.0004857207373334762,
+            "option_93": 0.0019210627820674517,
+            "option_123": 0.0006236777721484938,
+            "option_143": 0.00013916125482323625
+          },
+          "prompt_sha256": "a1ce97f0bbd08622a3b10157b2a55c3be49ccc374265fd847e330fdad5fd86b2",
+          "prompt_tokens": 165,
+          "requests": 1,
+          "missing_from_top": [],
+          "ranks": {},
+          "sampled": "B",
+          "elapsed_ms": 0.0
+        }
+      ],
+      "expected": "option_27",
+      "scores": {
+        "option_0": 0.0,
+        "option_1": 0.0,
+        "option_2": 0.0,
+        "option_3": 0.0,
+        "option_4": 0.0,
+        "option_5": 0.0,
+        "option_6": 0.0,
+        "option_7": 0.0,
+        "option_8": 0.0,
+        "option_9": 0.0,
+        "option_10": 0.0,
+        "option_11": 0.0,
+        "option_12": 0.0,
+        "option_13": 0.0,
+        "option_14": 0.0016953319548450715,
+        "option_15": 0.0,
+        "option_16": 0.0,
+        "option_17": 0.0,
+        "option_18": 0.0,
+        "option_19": 0.0,
+        "option_20": 0.0,
+        "option_21": 0.0,
+        "option_22": 0.0,
+        "option_23": 0.0,
+        "option_24": 0.0,
+        "option_25": 0.0,
+        "option_26": 0.0,
+        "option_27": 0.9951350454987822,
+        "option_28": 0.0,
+        "option_29": 0.0,
+        "option_30": 0.0,
+        "option_31": 0.0,
+        "option_32": 0.0,
+        "option_33": 0.0,
+        "option_34": 0.0,
+        "option_35": 0.0,
+        "option_36": 0.0,
+        "option_37": 0.0,
+        "option_38": 0.0,
+        "option_39": 0.0,
+        "option_40": 0.0,
+        "option_41": 0.0,
+        "option_42": 0.0,
+        "option_43": 0.0,
+        "option_44": 0.0,
+        "option_45": 0.0,
+        "option_46": 0.0,
+        "option_47": 0.0,
+        "option_48": 0.0,
+        "option_49": 0.0,
+        "option_50": 0.0,
+        "option_51": 0.0,
+        "option_52": 0.0,
+        "option_53": 0.0,
+        "option_54": 0.0,
+        "option_55": 0.0,
+        "option_56": 0.0,
+        "option_57": 0.0,
+        "option_58": 0.0,
+        "option_59": 0.0,
+        "option_60": 0.0,
+        "option_61": 0.0,
+        "option_62": 0.0,
+        "option_63": 0.0,
+        "option_64": 0.0,
+        "option_65": 0.0,
+        "option_66": 0.0,
+        "option_67": 0.0004857207373334762,
+        "option_68": 0.0,
+        "option_69": 0.0,
+        "option_70": 0.0,
+        "option_71": 0.0,
+        "option_72": 0.0,
+        "option_73": 0.0,
+        "option_74": 0.0,
+        "option_75": 0.0,
+        "option_76": 0.0,
+        "option_77": 0.0,
+        "option_78": 0.0,
+        "option_79": 0.0,
+        "option_80": 0.0,
+        "option_81": 0.0,
+        "option_82": 0.0,
+        "option_83": 0.0,
+        "option_84": 0.0,
+        "option_85": 0.0,
+        "option_86": 0.0,
+        "option_87": 0.0,
+        "option_88": 0.0,
+        "option_89": 0.0,
+        "option_90": 0.0,
+        "option_91": 0.0,
+        "option_92": 0.0,
+        "option_93": 0.0019210627820674517,
+        "option_94": 0.0,
+        "option_95": 0.0,
+        "option_96": 0.0,
+        "option_97": 0.0,
+        "option_98": 0.0,
+        "option_99": 0.0,
+        "option_100": 0.0,
+        "option_101": 0.0,
+        "option_102": 0.0,
+        "option_103": 0.0,
+        "option_104": 0.0,
+        "option_105": 0.0,
+        "option_106": 0.0,
+        "option_107": 0.0,
+        "option_108": 0.0,
+        "option_109": 0.0,
+        "option_110": 0.0,
+        "option_111": 0.0,
+        "option_112": 0.0,
+        "option_113": 0.0,
+        "option_114": 0.0,
+        "option_115": 0.0,
+        "option_116": 0.0,
+        "option_117": 0.0,
+        "option_118": 0.0,
+        "option_119": 0.0,
+        "option_120": 0.0,
+        "option_121": 0.0,
+        "option_122": 0.0,
+        "option_123": 0.0006236777721484938,
+        "option_124": 0.0,
+        "option_125": 0.0,
+        "option_126": 0.0,
+        "option_127": 0.0,
+        "option_128": 0.0,
+        "option_129": 0.0,
+        "option_130": 0.0,
+        "option_131": 0.0,
+        "option_132": 0.0,
+        "option_133": 0.0,
+        "option_134": 0.0,
+        "option_135": 0.0,
+        "option_136": 0.0,
+        "option_137": 0.0,
+        "option_138": 0.0,
+        "option_139": 0.0,
+        "option_140": 0.0,
+        "option_141": 0.0,
+        "option_142": 0.0,
+        "option_143": 0.00013916125482323625,
+        "option_144": 0.0,
+        "option_145": 0.0,
+        "option_146": 0.0,
+        "option_147": 0.0,
+        "option_148": 0.0,
+        "option_149": 0.0,
+        "option_150": 0.0
+      }
+    },
+    {
+      "id": "ChessBench:test:a6a99bac43c971750ca141e09dcae56fcdcfc46c93f9c70a672252080a29a438",
+      "state": {
+        "fen": "r2qk2r/pp2npbp/2b3p1/3pP3/8/1PN2NP1/P2Q2BP/R4RK1 b kq - 2 17",
+        "board": "r . . q k . . r\np p . . n p b p\n. . b . . . p .\n. . . p P . . .\n. . . . . . . .\n. P N . . N P .\nP . . Q . . B P\nR . . . . R K .",
+        "side_to_move": "black"
+      },
+      "question": {
+        "type": "choice",
+        "instructions": "Choose the strongest legal move for the side to move. Board rows run from rank 8 to rank 1; columns a to h. Uppercase pieces are white. All legal moves are supplied.",
+        "criteria": {
+          "b7b6": {
+            "uci": "b7b6",
+            "san": "b6"
+          },
+          "d8b8": {
+            "uci": "d8b8",
+            "san": "Qb8"
+          },
+          "g7h6": {
+            "uci": "g7h6",
+            "san": "Bh6"
+          },
+          "g7e5": {
+            "uci": "g7e5",
+            "san": "Bxe5"
+          },
+          "f7f6": {
+            "uci": "f7f6",
+            "san": "f6"
+          },
+          "d8d6": {
+            "uci": "d8d6",
+            "san": "Qd6"
+          },
+          "c6b5": {
+            "uci": "c6b5",
+            "san": "Bb5"
+          },
+          "d8d7": {
+            "uci": "d8d7",
+            "san": "Qd7"
+          },
+          "c6a4": {
+            "uci": "c6a4",
+            "san": "Ba4"
+          },
+          "a7a5": {
+            "uci": "a7a5",
+            "san": "a5"
+          },
+          "e7g8": {
+            "uci": "e7g8",
+            "san": "Ng8"
+          },
+          "f7f5": {
+            "uci": "f7f5",
+            "san": "f5"
+          },
+          "b7b5": {
+            "uci": "b7b5",
+            "san": "b5"
+          },
+          "a8b8": {
+            "uci": "a8b8",
+            "san": "Rb8"
+          },
+          "e7c8": {
+            "uci": "e7c8",
+            "san": "Nc8"
+          },
+          "g6g5": {
+            "uci": "g6g5",
+            "san": "g5"
+          },
+          "d8c7": {
+            "uci": "d8c7",
+            "san": "Qc7"
+          },
+          "d8c8": {
+            "uci": "d8c8",
+            "san": "Qc8"
+          },
+          "d8b6": {
+            "uci": "d8b6",
+            "san": "Qb6+"
+          },
+          "c6d7": {
+            "uci": "c6d7",
+            "san": "Bd7"
+          },
+          "g7f8": {
+            "uci": "g7f8",
+            "san": "Bf8"
+          },
+          "d5d4": {
+            "uci": "d5d4",
+            "san": "d4"
+          },
+          "a7a6": {
+            "uci": "a7a6",
+            "san": "a6"
+          },
+          "e8f8": {
+            "uci": "e8f8",
+            "san": "Kf8"
+          },
+          "h8g8": {
+            "uci": "h8g8",
+            "san": "Rg8"
+          },
+          "g7f6": {
+            "uci": "g7f6",
+            "san": "Bf6"
+          },
+          "e7f5": {
+            "uci": "e7f5",
+            "san": "Nf5"
+          },
+          "a8c8": {
+            "uci": "a8c8",
+            "san": "Rc8"
+          },
+          "h7h5": {
+            "uci": "h7h5",
+            "san": "h5"
+          },
+          "e8g8": {
+            "uci": "e8g8",
+            "san": "O-O"
+          },
+          "h8f8": {
+            "uci": "h8f8",
+            "san": "Rf8"
+          },
+          "h7h6": {
+            "uci": "h7h6",
+            "san": "h6"
+          },
+          "d8a5": {
+            "uci": "d8a5",
+            "san": "Qa5"
+          },
+          "e8d7": {
+            "uci": "e8d7",
+            "san": "Kd7"
+          }
+        }
+      },
+      "components": [
+        {
+          "keys": [
+            "b7b6",
+            "d8b8",
+            "g7h6",
+            "g7e5",
+            "f7f6",
+            "d8d6",
+            "c6b5",
+            "d8d7",
+            "c6a4",
+            "a7a5",
+            "e7g8",
+            "f7f5",
+            "b7b5",
+            "a8b8",
+            "e7c8",
+            "g6g5",
+            "d8c7"
+          ],
+          "logprobs": {
+            "b7b6": -3.7190678119659424,
+            "d8b8": -3.2190678119659424,
+            "g7h6": -3.9690678119659424,
+            "g7e5": -0.5940677523612976,
+            "f7f6": -3.5940678119659424,
+            "d8d6": -4.344067573547363,
+            "c6b5": -3.7190678119659424,
+            "d8d7": -2.5940678119659424,
+            "c6a4": -6.594067573547363,
+            "a7a5": -6.344067573547363,
+            "e7g8": -6.094067573547363,
+            "f7f5": -5.344067573547363,
+            "b7b5": -5.344067573547363,
+            "a8b8": -7.344067573547363,
+            "e7c8": -7.344067573547363,
+            "g6g5": -5.594067573547363,
+            "d8c7": -1.5940678119659424
+          },
+          "probabilities": {
+            "b7b6": 0.02431239091612355,
+            "d8b8": 0.040084356044989465,
+            "g7h6": 0.01893450908381513,
+            "g7e5": 0.5533474997058644,
+            "f7f6": 0.02754954815696136,
+            "d8d6": 0.013013488195133408,
+            "c6b5": 0.02431239091612355,
+            "d8d7": 0.07488743613732546,
+            "c6a4": 0.0013716115646120366,
+            "a7a5": 0.0017611841107846953,
+            "e7g8": 0.002261405161714148,
+            "f7f5": 0.00478739476491684,
+            "b7b5": 0.00478739476491684,
+            "a8b8": 0.0006479034264754974,
+            "e7c8": 0.0006479034264754974,
+            "g6g5": 0.0037284267917891785,
+            "d8c7": 0.20356515683197898
+          },
+          "prompt_sha256": "c86b0361e3ff893619cbadc0d27fa6da81551801612c1825eecbc6e23a63642d",
+          "prompt_tokens": 681,
+          "requests": 1,
+          "missing_from_top": [],
+          "ranks": {},
+          "sampled": "D",
+          "elapsed_ms": 0.0
+        },
+        {
+          "keys": [
+            "d8c8",
+            "d8b6",
+            "c6d7",
+            "g7f8",
+            "d5d4",
+            "a7a6",
+            "e8f8",
+            "h8g8",
+            "g7f6",
+            "e7f5",
+            "a8c8",
+            "h7h5",
+            "e8g8",
+            "h8f8",
+            "h7h6",
+            "d8a5",
+            "e8d7"
+          ],
+          "logprobs": {
+            "d8c8": -4.627701282501221,
+            "d8b6": -0.3777011036872864,
+            "c6d7": -6.002701282501221,
+            "g7f8": -4.502701282501221,
+            "d5d4": -2.1277010440826416,
+            "a7a6": -8.127700805664062,
+            "e8f8": -6.502701282501221,
+            "h8g8": -5.127701282501221,
+            "g7f6": -4.877701282501221,
+            "e7f5": -2.0027010440826416,
+            "a8c8": -5.752701282501221,
+            "h7h5": -6.127701282501221,
+            "e8g8": -4.502701282501221,
+            "h8f8": -7.877701282501221,
+            "h7h6": -8.127700805664062,
+            "d8a5": -5.752701282501221,
+            "e8d7": -7.377701282501221
+          },
+          "probabilities": {
+            "d8c8": 0.009786090343371696,
+            "d8b6": 0.686058021460736,
+            "c6d7": 0.002474311126926832,
+            "g7f8": 0.011089093134163844,
+            "d5d4": 0.11921901493104903,
+            "a7a6": 0.0002955144632164869,
+            "e8f8": 0.0015007455601492412,
+            "h8g8": 0.005935563831972667,
+            "g7f6": 0.0076214148226253905,
+            "e7f5": 0.13509284234526908,
+            "a8c8": 0.003177078375767341,
+            "h7h5": 0.002183571905543529,
+            "e8g8": 0.011089093134163844,
+            "h8f8": 0.000379447900833902,
+            "h7h6": 0.0002955144632164869,
+            "d8a5": 0.003177078375767341,
+            "e8d7": 0.0006256038252273671
+          },
+          "prompt_sha256": "7a74436487b79a0743b65f3b494046e08873f1e0d11a5ed4d0d7d53ef008a37b",
+          "prompt_tokens": 682,
+          "requests": 1,
+          "missing_from_top": [],
+          "ranks": {},
+          "sampled": "B",
+          "elapsed_ms": 0.0
+        },
+        {
+          "keys": [
+            "g7e5",
+            "d8b6"
+          ],
+          "logprobs": {
+            "g7e5": -0.8565093278884888,
+            "d8b6": -0.6065093278884888
+          },
+          "probabilities": {
+            "g7e5": 0.4378234991142019,
+            "d8b6": 0.5621765008857981
+          },
+          "prompt_sha256": "b8a6a0e579c7d0de49290a07442c045808b54310bda7d8557045df2e6100ea9d",
+          "prompt_tokens": 289,
+          "requests": 1,
+          "missing_from_top": [],
+          "ranks": {},
+          "sampled": "B",
+          "elapsed_ms": 0.0
+        }
+      ],
+      "expected": "d8b6",
+      "scores": {
+        "b7b6": 0.0,
+        "d8b8": 0.0,
+        "g7h6": 0.0,
+        "g7e5": 0.4378234991142019,
+        "f7f6": 0.0,
+        "d8d6": 0.0,
+        "c6b5": 0.0,
+        "d8d7": 0.0,
+        "c6a4": 0.0,
+        "a7a5": 0.0,
+        "e7g8": 0.0,
+        "f7f5": 0.0,
+        "b7b5": 0.0,
+        "a8b8": 0.0,
+        "e7c8": 0.0,
+        "g6g5": 0.0,
+        "d8c7": 0.0,
+        "d8c8": 0.0,
+        "d8b6": 0.5621765008857981,
+        "c6d7": 0.0,
+        "g7f8": 0.0,
+        "d5d4": 0.0,
+        "a7a6": 0.0,
+        "e8f8": 0.0,
+        "h8g8": 0.0,
+        "g7f6": 0.0,
+        "e7f5": 0.0,
+        "a8c8": 0.0,
+        "h7h5": 0.0,
+        "e8g8": 0.0,
+        "h8f8": 0.0,
+        "h7h6": 0.0,
+        "d8a5": 0.0,
+        "e8d7": 0.0
+      }
+    },
+    {
+      "id": "BANKING77:test:2330",
+      "state": {},
+      "question": {
+        "type": "choice",
+        "instructions": "Classify the banking intent of this user request:\nI NEED TO KNOW HOW TO TRANSFER MONEY INTO MY BANK ACCOUNT. PLEASE HELP",
+        "criteria": {
+          "option_0": "card_arrival",
+          "option_1": "card_linking",
+          "option_2": "exchange_rate",
+          "option_3": "card_payment_wrong_exchange_rate",
+          "option_4": "extra_charge_on_statement",
+          "option_5": "pending_cash_withdrawal",
+          "option_6": "fiat_currency_support",
+          "option_7": "card_delivery_estimate",
+          "option_8": "automatic_top_up",
+          "option_9": "card_not_working",
+          "option_10": "exchange_via_app",
+          "option_11": "lost_or_stolen_card",
+          "option_12": "age_limit",
+          "option_13": "pin_blocked",
+          "option_14": "contactless_not_working",
+          "option_15": "top_up_by_bank_transfer_charge",
+          "option_16": "pending_top_up",
+          "option_17": "cancel_transfer",
+          "option_18": "top_up_limits",
+          "option_19": "wrong_amount_of_cash_received",
+          "option_20": "card_payment_fee_charged",
+          "option_21": "transfer_not_received_by_recipient",
+          "option_22": "supported_cards_and_currencies",
+          "option_23": "getting_virtual_card",
+          "option_24": "card_acceptance",
+          "option_25": "top_up_reverted",
+          "option_26": "balance_not_updated_after_cheque_or_cash_deposit",
+          "option_27": "card_payment_not_recognised",
+          "option_28": "edit_personal_details",
+          "option_29": "why_verify_identity",
+          "option_30": "unable_to_verify_identity",
+          "option_31": "get_physical_card",
+          "option_32": "visa_or_mastercard",
+          "option_33": "topping_up_by_card",
+          "option_34": "disposable_card_limits",
+          "option_35": "compromised_card",
+          "option_36": "atm_support",
+          "option_37": "direct_debit_payment_not_recognised",
+          "option_38": "passcode_forgotten",
+          "option_39": "declined_cash_withdrawal",
+          "option_40": "pending_card_payment",
+          "option_41": "lost_or_stolen_phone",
+          "option_42": "request_refund",
+          "option_43": "declined_transfer",
+          "option_44": "Refund_not_showing_up",
+          "option_45": "declined_card_payment",
+          "option_46": "pending_transfer",
+          "option_47": "terminate_account",
+          "option_48": "card_swallowed",
+          "option_49": "transaction_charged_twice",
+          "option_50": "verify_source_of_funds",
+          "option_51": "transfer_timing",
+          "option_52": "reverted_card_payment?",
+          "option_53": "change_pin",
+          "option_54": "beneficiary_not_allowed",
+          "option_55": "transfer_fee_charged",
+          "option_56": "receiving_money",
+          "option_57": "failed_transfer",
+          "option_58": "transfer_into_account",
+          "option_59": "verify_top_up",
+          "option_60": "getting_spare_card",
+          "option_61": "top_up_by_cash_or_cheque",
+          "option_62": "order_physical_card",
+          "option_63": "virtual_card_not_working",
+          "option_64": "wrong_exchange_rate_for_cash_withdrawal",
+          "option_65": "get_disposable_virtual_card",
+          "option_66": "top_up_failed",
+          "option_67": "balance_not_updated_after_bank_transfer",
+          "option_68": "cash_withdrawal_not_recognised",
+          "option_69": "exchange_charge",
+          "option_70": "top_up_by_card_charge",
+          "option_71": "activate_my_card",
+          "option_72": "cash_withdrawal_charge",
+          "option_73": "card_about_to_expire",
+          "option_74": "apple_pay_or_google_pay",
+          "option_75": "verify_my_identity",
+          "option_76": "country_support"
+        }
+      },
+      "components": [
+        {
+          "keys": [
+            "option_0",
+            "option_1",
+            "option_2",
+            "option_3",
+            "option_4",
+            "option_5",
+            "option_6",
+            "option_7",
+            "option_8",
+            "option_9",
+            "option_10",
+            "option_11",
+            "option_12",
+            "option_13",
+            "option_14",
+            "option_15",
+            "option_16",
+            "option_17",
+            "option_18",
+            "option_19",
+            "option_20",
+            "option_21",
+            "option_22",
+            "option_23",
+            "option_24",
+            "option_25"
+          ],
+          "logprobs": {
+            "option_0": -3.478259563446045,
+            "option_1": -3.103259563446045,
+            "option_2": -5.728259563446045,
+            "option_3": -4.228259563446045,
+            "option_4": -4.728259563446045,
+            "option_5": -5.478259563446045,
+            "option_6": -1.9782596826553345,
+            "option_7": -2.728259563446045,
+            "option_8": -1.3532596826553345,
+            "option_9": -4.478259563446045,
+            "option_10": -1.3532596826553345,
+            "option_11": -5.103259563446045,
+            "option_12": -6.103259563446045,
+            "option_13": -4.603259563446045,
+            "option_14": -7.103259563446045,
+            "option_15": -4.603259563446045,
+            "option_16": -3.103259563446045,
+            "option_17": -6.353259563446045,
+            "option_18": -3.353259563446045,
+            "option_19": -6.603259563446045,
+            "option_20": -6.353259563446045,
+            "option_21": -6.728259563446045,
+            "option_22": -3.353259563446045,
+            "option_23": -5.228259563446045,
+            "option_24": -7.603259563446045,
+            "option_25": -5.853259563446045
+          },
+          "probabilities": {
+            "option_0": 0.03094820913951599,
+            "option_1": 0.04502937859580432,
+            "option_2": 0.003261917244883388,
+            "option_3": 0.014618898864741133,
+            "option_4": 0.008866810372703707,
+            "option_5": 0.004188384649562322,
+            "option_6": 0.13870023411274807,
+            "option_7": 0.06551735926248788,
+            "option_8": 0.25912615167604436,
+            "option_9": 0.011385209883502067,
+            "option_10": 0.25912615167604436,
+            "option_11": 0.0060940637062318415,
+            "option_12": 0.0022418807507117388,
+            "option_13": 0.010047412457466095,
+            "option_14": 0.000824741837744848,
+            "option_15": 0.010047412457466095,
+            "option_16": 0.04502937859580432,
+            "option_17": 0.001745978484207011,
+            "option_18": 0.03506891531163116,
+            "option_19": 0.0013597694107262447,
+            "option_20": 0.001745978484207011,
+            "option_21": 0.0011999922931951916,
+            "option_22": 0.03506891531163116,
+            "option_23": 0.005377992344902801,
+            "option_24": 0.0005002312109399923,
+            "option_25": 0.002878631865096867
+          },
+          "prompt_sha256": "e85f6537abd1b2ae77209216b1352624b70fea0ef3adcd52e3e2ac14d22aef03",
+          "prompt_tokens": 517,
+          "requests": 1,
+          "missing_from_top": [],
+          "ranks": {},
+          "sampled": "I",
+          "elapsed_ms": 0.0
+        },
+        {
+          "keys": [
+            "option_26",
+            "option_27",
+            "option_28",
+            "option_29",
+            "option_30",
+            "option_31",
+            "option_32",
+            "option_33",
+            "option_34",
+            "option_35",
+            "option_36",
+            "option_37",
+            "option_38",
+            "option_39",
+            "option_40",
+            "option_41",
+            "option_42",
+            "option_43",
+            "option_44",
+            "option_45",
+            "option_46",
+            "option_47",
+            "option_48",
+            "option_49",
+            "option_50",
+            "option_51"
+          ],
+          "logprobs": {
+            "option_26": -2.2689900398254395,
+            "option_27": -4.2689900398254395,
+            "option_28": -5.6439900398254395,
+            "option_29": -4.3939900398254395,
+            "option_30": -4.3939900398254395,
+            "option_31": -6.1439900398254395,
+            "option_32": -5.2689900398254395,
+            "option_33": -0.6439900398254395,
+            "option_34": -4.6439900398254395,
+            "option_35": -5.2689900398254395,
+            "option_36": -3.2689900398254395,
+            "option_37": -6.1439900398254395,
+            "option_38": -5.6439900398254395,
+            "option_39": -4.2689900398254395,
+            "option_40": -7.1439900398254395,
+            "option_41": -6.6439900398254395,
+            "option_42": -6.2689900398254395,
+            "option_43": -6.2689900398254395,
+            "option_44": -5.3939900398254395,
+            "option_45": -6.7689900398254395,
+            "option_46": -5.2689900398254395,
+            "option_47": -8.268989562988281,
+            "option_48": -6.6439900398254395,
+            "option_49": -5.2689900398254395,
+            "option_50": -6.8939900398254395,
+            "option_51": -1.5189900398254395
+          },
+          "probabilities": {
+            "option_26": 0.10403972013054485,
+            "option_27": 0.014080244991725202,
+            "option_28": 0.003560043452539606,
+            "option_29": 0.012425772592829752,
+            "option_30": 0.012425772592829752,
+            "option_31": 0.002159275503874488,
+            "option_32": 0.005179832659112866,
+            "option_33": 0.5283572953338467,
+            "option_34": 0.009677201425563012,
+            "option_35": 0.005179832659112866,
+            "option_36": 0.0382740741012581,
+            "option_37": 0.002159275503874488,
+            "option_38": 0.003560043452539606,
+            "option_39": 0.014080244991725202,
+            "option_40": 0.0007943530657005313,
+            "option_41": 0.0013096667958663224,
+            "option_42": 0.0019055539439960275,
+            "option_43": 0.0019055539439960275,
+            "option_44": 0.004571186277573634,
+            "option_45": 0.0011557768907699212,
+            "option_46": 0.005179832659112866,
+            "option_47": 0.0002578888057042827,
+            "option_48": 0.0013096667958663224,
+            "option_49": 0.005179832659112866,
+            "option_50": 0.0010199695261833097,
+            "option_51": 0.22025208924474146
+          },
+          "prompt_sha256": "06f8cd93cc736641f224b15798d62ac00a138368ef64154f9034c29022fd7b37",
+          "prompt_tokens": 523,
+          "requests": 1,
+          "missing_from_top": [],
+          "ranks": {},
+          "sampled": "H",
+          "elapsed_ms": 0.0
+        },
+        {
+          "keys": [
+            "option_52",
+            "option_53",
+            "option_54",
+            "option_55",
+            "option_56",
+            "option_57",
+            "option_58",
+            "option_59",
+            "option_60",
+            "option_61",
+            "option_62",
+            "option_63",
+            "option_64",
+            "option_65",
+            "option_66",
+            "option_67",
+            "option_68",
+            "option_69",
+            "option_70",
+            "option_71",
+            "option_72",
+            "option_73",
+            "option_74",
+            "option_75",
+            "option_76"
+          ],
+          "logprobs": {
+            "option_52": -7.66269588470459,
+            "option_53": -7.53769588470459,
+            "option_54": -9.03769588470459,
+            "option_55": -7.66269588470459,
+            "option_56": -3.78769588470459,
+            "option_57": -7.91269588470459,
+            "option_58": -0.03769581392407417,
+            "option_59": -5.41269588470459,
+            "option_60": -7.41269588470459,
+            "option_61": -5.53769588470459,
+            "option_62": -8.78769588470459,
+            "option_63": -8.28769588470459,
+            "option_64": -8.53769588470459,
+            "option_65": -8.66269588470459,
+            "option_66": -9.53769588470459,
+            "option_67": -8.03769588470459,
+            "option_68": -9.41269588470459,
+            "option_69": -8.78769588470459,
+            "option_70": -8.16269588470459,
+            "option_71": -8.66269588470459,
+            "option_72": -9.03769588470459,
+            "option_73": -9.78769588470459,
+            "option_74": -9.03769588470459,
+            "option_75": -8.16269588470459,
+            "option_76": -9.28769588470459
+          },
+          "probabilities": {
+            "option_52": 0.0004704422440025845,
+            "option_53": 0.0005330809010488151,
+            "option_54": 0.00011894642682309138,
+            "option_55": 0.0004704422440025845,
+            "option_56": 0.02266717670616402,
+            "option_57": 0.0003663807880190817,
+            "option_58": 0.963832947653304,
+            "option_59": 0.004463431737360243,
+            "option_60": 0.0006040597983829346,
+            "option_61": 0.003938964683118193,
+            "option_62": 0.00015273023526503785,
+            "option_63": 0.0002518095875605027,
+            "option_64": 0.00019610950397700702,
+            "option_65": 0.0001730660298271101,
+            "option_66": 7.214465473147008e-05,
+            "option_67": 0.00032332991059334283,
+            "option_68": 8.175060390600563e-05,
+            "option_69": 0.00015273023526503785,
+            "option_70": 0.00028533764461157927,
+            "option_71": 0.0001730660298271101,
+            "option_72": 0.00011894642682309138,
+            "option_73": 5.6186313599285036e-05,
+            "option_74": 0.00011894642682309138,
+            "option_75": 0.00028533764461157927,
+            "option_76": 9.263557035336912e-05
+          },
+          "prompt_sha256": "7296a0a3d4d6d07db03d85b04814bb64498ab041fb37448debb1326a182e7403",
+          "prompt_tokens": 515,
+          "requests": 1,
+          "missing_from_top": [],
+          "ranks": {},
+          "sampled": "G",
+          "elapsed_ms": 0.0
+        },
+        {
+          "keys": [
+            "option_8",
+            "option_33",
+            "option_58"
+          ],
+          "logprobs": {
+            "option_8": -4.671875476837158,
+            "option_33": -3.671875238418579,
+            "option_58": -0.04687526077032089
+          },
+          "probabilities": {
+            "option_8": 0.009458851751361753,
+            "option_33": 0.02571183096399214,
+            "option_58": 0.964829317284646
+          },
+          "prompt_sha256": "821d68b79592477e0dbd9d37b02a5d63d48cf2722552023f17ac03cdcdcf884b",
+          "prompt_tokens": 135,
+          "requests": 1,
+          "missing_from_top": [],
+          "ranks": {},
+          "sampled": "C",
+          "elapsed_ms": 0.0
+        }
+      ],
+      "expected": "option_58",
+      "scores": {
+        "option_0": 0.0,
+        "option_1": 0.0,
+        "option_2": 0.0,
+        "option_3": 0.0,
+        "option_4": 0.0,
+        "option_5": 0.0,
+        "option_6": 0.0,
+        "option_7": 0.0,
+        "option_8": 0.009458851751361753,
+        "option_9": 0.0,
+        "option_10": 0.0,
+        "option_11": 0.0,
+        "option_12": 0.0,
+        "option_13": 0.0,
+        "option_14": 0.0,
+        "option_15": 0.0,
+        "option_16": 0.0,
+        "option_17": 0.0,
+        "option_18": 0.0,
+        "option_19": 0.0,
+        "option_20": 0.0,
+        "option_21": 0.0,
+        "option_22": 0.0,
+        "option_23": 0.0,
+        "option_24": 0.0,
+        "option_25": 0.0,
+        "option_26": 0.0,
+        "option_27": 0.0,
+        "option_28": 0.0,
+        "option_29": 0.0,
+        "option_30": 0.0,
+        "option_31": 0.0,
+        "option_32": 0.0,
+        "option_33": 0.02571183096399214,
+        "option_34": 0.0,
+        "option_35": 0.0,
+        "option_36": 0.0,
+        "option_37": 0.0,
+        "option_38": 0.0,
+        "option_39": 0.0,
+        "option_40": 0.0,
+        "option_41": 0.0,
+        "option_42": 0.0,
+        "option_43": 0.0,
+        "option_44": 0.0,
+        "option_45": 0.0,
+        "option_46": 0.0,
+        "option_47": 0.0,
+        "option_48": 0.0,
+        "option_49": 0.0,
+        "option_50": 0.0,
+        "option_51": 0.0,
+        "option_52": 0.0,
+        "option_53": 0.0,
+        "option_54": 0.0,
+        "option_55": 0.0,
+        "option_56": 0.0,
+        "option_57": 0.0,
+        "option_58": 0.964829317284646,
+        "option_59": 0.0,
+        "option_60": 0.0,
+        "option_61": 0.0,
+        "option_62": 0.0,
+        "option_63": 0.0,
+        "option_64": 0.0,
+        "option_65": 0.0,
+        "option_66": 0.0,
+        "option_67": 0.0,
+        "option_68": 0.0,
+        "option_69": 0.0,
+        "option_70": 0.0,
+        "option_71": 0.0,
+        "option_72": 0.0,
+        "option_73": 0.0,
+        "option_74": 0.0,
+        "option_75": 0.0,
+        "option_76": 0.0
+      }
+    },
+    {
+      "id": "POP909:096:beat-82",
+      "state": {
+        "target_time_beats": 82,
+        "context_notes": [
+          {
+            "pitch": 73,
+            "pitch_class": 1,
+            "start_beat": 78.0,
+            "end_beat": 78.33333333333333
+          },
+          {
+            "pitch": 72,
+            "pitch_class": 0,
+            "start_beat": 78.5,
+            "end_beat": 79.04166666666667
+          },
+          {
+            "pitch": 46,
+            "pitch_class": 10,
+            "start_beat": 78.0,
+            "end_beat": 79.08333333333333
+          },
+          {
+            "pitch": 58,
+            "pitch_class": 10,
+            "start_beat": 78.5,
+            "end_beat": 79.08333333333333
+          },
+          {
+            "pitch": 61,
+            "pitch_class": 1,
+            "start_beat": 78.5,
+            "end_beat": 79.08333333333333
+          },
+          {
+            "pitch": 65,
+            "pitch_class": 5,
+            "start_beat": 78.5,
+            "end_beat": 79.08333333333333
+          },
+          {
+            "pitch": 65,
+            "pitch_class": 5,
+            "start_beat": 79.5,
+            "end_beat": 79.54166666666667
+          },
+          {
+            "pitch": 58,
+            "pitch_class": 10,
+            "start_beat": 79.5,
+            "end_beat": 79.66666666666667
+          },
+          {
+            "pitch": 61,
+            "pitch_class": 1,
+            "start_beat": 79.5,
+            "end_beat": 79.66666666666667
+          },
+          {
+            "pitch": 53,
+            "pitch_class": 5,
+            "start_beat": 79.0,
+            "end_beat": 79.79166666666667
+          },
+          {
+            "pitch": 68,
+            "pitch_class": 8,
+            "start_beat": 79.5,
+            "end_beat": 79.79166666666667
+          },
+          {
+            "pitch": 58,
+            "pitch_class": 10,
+            "start_beat": 80.5,
+            "end_beat": 81.16666666666667
+          },
+          {
+            "pitch": 65,
+            "pitch_class": 5,
+            "start_beat": 80.5,
+            "end_beat": 81.16666666666667
+          },
+          {
+            "pitch": 46,
+            "pitch_class": 10,
+            "start_beat": 80.0,
+            "end_beat": 81.20833333333333
+          },
+          {
+            "pitch": 61,
+            "pitch_class": 1,
+            "start_beat": 80.5,
+            "end_beat": 81.20833333333333
+          },
+          {
+            "pitch": 53,
+            "pitch_class": 5,
+            "start_beat": 81.0,
+            "end_beat": 81.625
+          },
+          {
+            "pitch": 70,
+            "pitch_class": 10,
+            "start_beat": 80.0,
+            "end_beat": 81.66666666666667
+          },
+          {
+            "pitch": 58,
+            "pitch_class": 10,
+            "start_beat": 81.5,
+            "end_beat": 81.66666666666667
+          },
+          {
+            "pitch": 65,
+            "pitch_class": 5,
+            "start_beat": 81.5,
+            "end_beat": 81.66666666666667
+          },
+          {
+            "pitch": 61,
+            "pitch_class": 1,
+            "start_beat": 81.5,
+            "end_beat": 81.70833333333333
+          },
+          {
+            "pitch": 77,
+            "pitch_class": 5,
+            "start_beat": 82.0,
+            "end_beat": 82.20833333333333
+          },
+          {
+            "pitch": 77,
+            "pitch_class": 5,
+            "start_beat": 82.5,
+            "end_beat": 82.70833333333333
+          },
+          {
+            "pitch": 46,
+            "pitch_class": 10,
+            "start_beat": 82.0,
+            "end_beat": 82.95833333333333
+          },
+          {
+            "pitch": 58,
+            "pitch_class": 10,
+            "start_beat": 82.5,
+            "end_beat": 83.08333333333333
+          },
+          {
+            "pitch": 65,
+            "pitch_class": 5,
+            "start_beat": 82.5,
+            "end_beat": 83.08333333333333
+          },
+          {
+            "pitch": 61,
+            "pitch_class": 1,
+            "start_beat": 82.5,
+            "end_beat": 83.125
+          },
+          {
+            "pitch": 77,
+            "pitch_class": 5,
+            "start_beat": 83.0,
+            "end_beat": 83.20833333333333
+          },
+          {
+            "pitch": 58,
+            "pitch_class": 10,
+            "start_beat": 83.5,
+            "end_beat": 83.66666666666667
+          },
+          {
+            "pitch": 65,
+            "pitch_class": 5,
+            "start_beat": 83.5,
+            "end_beat": 83.66666666666667
+          },
+          {
+            "pitch": 75,
+            "pitch_class": 3,
+            "start_beat": 83.5,
+            "end_beat": 83.66666666666667
+          },
+          {
+            "pitch": 61,
+            "pitch_class": 1,
+            "start_beat": 83.5,
+            "end_beat": 83.70833333333333
+          },
+          {
+            "pitch": 53,
+            "pitch_class": 5,
+            "start_beat": 83.0,
+            "end_beat": 83.75
+          },
+          {
+            "pitch": 73,
+            "pitch_class": 1,
+            "start_beat": 84.0,
+            "end_beat": 84.625
+          },
+          {
+            "pitch": 58,
+            "pitch_class": 10,
+            "start_beat": 84.5,
+            "end_beat": 85.20833333333333
+          },
+          {
+            "pitch": 61,
+            "pitch_class": 1,
+            "start_beat": 84.5,
+            "end_beat": 85.20833333333333
+          },
+          {
+            "pitch": 65,
+            "pitch_class": 5,
+            "start_beat": 84.5,
+            "end_beat": 85.20833333333333
+          },
+          {
+            "pitch": 46,
+            "pitch_class": 10,
+            "start_beat": 84.0,
+            "end_beat": 85.29166666666667
+          },
+          {
+            "pitch": 58,
+            "pitch_class": 10,
+            "start_beat": 85.5,
+            "end_beat": 85.66666666666667
+          },
+          {
+            "pitch": 70,
+            "pitch_class": 10,
+            "start_beat": 85.0,
+            "end_beat": 85.70833333333333
+          },
+          {
+            "pitch": 61,
+            "pitch_class": 1,
+            "start_beat": 85.5,
+            "end_beat": 85.70833333333333
+          },
+          {
+            "pitch": 53,
+            "pitch_class": 5,
+            "start_beat": 85.0,
+            "end_beat": 85.75
+          }
+        ],
+        "public_context": {
+          "ticks_per_beat": 480,
+          "key_signatures": [
+            {
+              "beat": 0.0,
+              "key": "Bbm"
+            }
+          ],
+          "time_signatures": [
+            {
+              "beat": 0.0,
+              "numerator": 4,
+              "denominator": 4
+            }
+          ]
+        }
+      },
+      "question": {
+        "type": "choice",
+        "instructions": "Infer the chord sounding at the target beat from the score notes and musical context. Choose its pitch-class set; MIDI pitch classes are C=0 through B=11. Equivalent chord names are grouped.",
+        "criteria": {
+          "chord_0": {
+            "names": "CM",
+            "pitch_classes": [
+              0,
+              4,
+              7
+            ]
+          },
+          "chord_1": {
+            "names": "Cm",
+            "pitch_classes": [
+              0,
+              3,
+              7
+            ]
+          },
+          "chord_2": {
+            "names": "Cdim",
+            "pitch_classes": [
+              0,
+              3,
+              6
+            ]
+          },
+          "chord_3": {
+            "names": "Caug / Eaug / G#aug",
+            "pitch_classes": [
+              0,
+              4,
+              8
+            ]
+          },
+          "chord_4": {
+            "names": "Csus2 / Gsus4",
+            "pitch_classes": [
+              0,
+              2,
+              7
+            ]
+          },
+          "chord_5": {
+            "names": "Csus4 / Fsus2",
+            "pitch_classes": [
+              0,
+              5,
+              7
+            ]
+          },
+          "chord_6": {
+            "names": "C7",
+            "pitch_classes": [
+              0,
+              4,
+              7,
+              10
+            ]
+          },
+          "chord_7": {
+            "names": "Cmaj7",
+            "pitch_classes": [
+              0,
+              4,
+              7,
+              11
+            ]
+          },
+          "chord_8": {
+            "names": "Cm7",
+            "pitch_classes": [
+              0,
+              3,
+              7,
+              10
+            ]
+          },
+          "chord_9": {
+            "names": "Chalf-dim7",
+            "pitch_classes": [
+              0,
+              3,
+              6,
+              10
+            ]
+          },
+          "chord_10": {
+            "names": "Cdim7 / D#dim7 / F#dim7 / Adim7",
+            "pitch_classes": [
+              0,
+              3,
+              6,
+              9
+            ]
+          },
+          "chord_11": {
+            "names": "CmMaj7",
+            "pitch_classes": [
+              0,
+              3,
+              7,
+              11
+            ]
+          },
+          "chord_12": {
+            "names": "Caug7",
+            "pitch_classes": [
+              0,
+              4,
+              8,
+              10
+            ]
+          },
+          "chord_13": {
+            "names": "C#M",
+            "pitch_classes": [
+              1,
+              5,
+              8
+            ]
+          },
+          "chord_14": {
+            "names": "C#m",
+            "pitch_classes": [
+              1,
+              4,
+              8
+            ]
+          },
+          "chord_15": {
+            "names": "C#dim",
+            "pitch_classes": [
+              1,
+              4,
+              7
+            ]
+          },
+          "chord_16": {
+            "names": "C#aug / Faug / Aaug",
+            "pitch_classes": [
+              1,
+              5,
+              9
+            ]
+          },
+          "chord_17": {
+            "names": "C#sus2 / G#sus4",
+            "pitch_classes": [
+              1,
+              3,
+              8
+            ]
+          },
+          "chord_18": {
+            "names": "C#sus4 / F#sus2",
+            "pitch_classes": [
+              1,
+              6,
+              8
+            ]
+          },
+          "chord_19": {
+            "names": "C#7",
+            "pitch_classes": [
+              1,
+              5,
+              8,
+              11
+            ]
+          },
+          "chord_20": {
+            "names": "C#maj7",
+            "pitch_classes": [
+              0,
+              1,
+              5,
+              8
+            ]
+          },
+          "chord_21": {
+            "names": "C#m7",
+            "pitch_classes": [
+              1,
+              4,
+              8,
+              11
+            ]
+          },
+          "chord_22": {
+            "names": "C#half-dim7",
+            "pitch_classes": [
+              1,
+              4,
+              7,
+              11
+            ]
+          },
+          "chord_23": {
+            "names": "C#dim7 / Edim7 / Gdim7 / A#dim7",
+            "pitch_classes": [
+              1,
+              4,
+              7,
+              10
+            ]
+          },
+          "chord_24": {
+            "names": "C#mMaj7",
+            "pitch_classes": [
+              0,
+              1,
+              4,
+              8
+            ]
+          },
+          "chord_25": {
+            "names": "C#aug7",
+            "pitch_classes": [
+              1,
+              5,
+              9,
+              11
+            ]
+          },
+          "chord_26": {
+            "names": "DM",
+            "pitch_classes": [
+              2,
+              6,
+              9
+            ]
+          },
+          "chord_27": {
+            "names": "Dm",
+            "pitch_classes": [
+              2,
+              5,
+              9
+            ]
+          },
+          "chord_28": {
+            "names": "Ddim",
+            "pitch_classes": [
+              2,
+              5,
+              8
+            ]
+          },
+          "chord_29": {
+            "names": "Daug / F#aug / A#aug",
+            "pitch_classes": [
+              2,
+              6,
+              10
+            ]
+          },
+          "chord_30": {
+            "names": "Dsus2 / Asus4",
+            "pitch_classes": [
+              2,
+              4,
+              9
+            ]
+          },
+          "chord_31": {
+            "names": "Dsus4 / Gsus2",
+            "pitch_classes": [
+              2,
+              7,
+              9
+            ]
+          },
+          "chord_32": {
+            "names": "D7",
+            "pitch_classes": [
+              0,
+              2,
+              6,
+              9
+            ]
+          },
+          "chord_33": {
+            "names": "Dmaj7",
+            "pitch_classes": [
+              1,
+              2,
+              6,
+              9
+            ]
+          },
+          "chord_34": {
+            "names": "Dm7",
+            "pitch_classes": [
+              0,
+              2,
+              5,
+              9
+            ]
+          },
+          "chord_35": {
+            "names": "Dhalf-dim7",
+            "pitch_classes": [
+              0,
+              2,
+              5,
+              8
+            ]
+          },
+          "chord_36": {
+            "names": "Ddim7 / Fdim7 / G#dim7 / Bdim7",
+            "pitch_classes": [
+              2,
+              5,
+              8,
+              11
+            ]
+          },
+          "chord_37": {
+            "names": "DmMaj7",
+            "pitch_classes": [
+              1,
+              2,
+              5,
+              9
+            ]
+          },
+          "chord_38": {
+            "names": "Daug7",
+            "pitch_classes": [
+              0,
+              2,
+              6,
+              10
+            ]
+          },
+          "chord_39": {
+            "names": "D#M",
+            "pitch_classes": [
+              3,
+              7,
+              10
+            ]
+          },
+          "chord_40": {
+            "names": "D#m",
+            "pitch_classes": [
+              3,
+              6,
+              10
+            ]
+          },
+          "chord_41": {
+            "names": "D#dim",
+            "pitch_classes": [
+              3,
+              6,
+              9
+            ]
+          },
+          "chord_42": {
+            "names": "D#aug / Gaug / Baug",
+            "pitch_classes": [
+              3,
+              7,
+              11
+            ]
+          },
+          "chord_43": {
+            "names": "D#sus2 / A#sus4",
+            "pitch_classes": [
+              3,
+              5,
+              10
+            ]
+          },
+          "chord_44": {
+            "names": "D#sus4 / G#sus2",
+            "pitch_classes": [
+              3,
+              8,
+              10
+            ]
+          },
+          "chord_45": {
+            "names": "D#7",
+            "pitch_classes": [
+              1,
+              3,
+              7,
+              10
+            ]
+          },
+          "chord_46": {
+            "names": "D#maj7",
+            "pitch_classes": [
+              2,
+              3,
+              7,
+              10
+            ]
+          },
+          "chord_47": {
+            "names": "D#m7",
+            "pitch_classes": [
+              1,
+              3,
+              6,
+              10
+            ]
+          },
+          "chord_48": {
+            "names": "D#half-dim7",
+            "pitch_classes": [
+              1,
+              3,
+              6,
+              9
+            ]
+          },
+          "chord_49": {
+            "names": "D#mMaj7",
+            "pitch_classes": [
+              2,
+              3,
+              6,
+              10
+            ]
+          },
+          "chord_50": {
+            "names": "D#aug7",
+            "pitch_classes": [
+              1,
+              3,
+              7,
+              11
+            ]
+          },
+          "chord_51": {
+            "names": "EM",
+            "pitch_classes": [
+              4,
+              8,
+              11
+            ]
+          },
+          "chord_52": {
+            "names": "Em",
+            "pitch_classes": [
+              4,
+              7,
+              11
+            ]
+          },
+          "chord_53": {
+            "names": "Edim",
+            "pitch_classes": [
+              4,
+              7,
+              10
+            ]
+          },
+          "chord_54": {
+            "names": "Esus2 / Bsus4",
+            "pitch_classes": [
+              4,
+              6,
+              11
+            ]
+          },
+          "chord_55": {
+            "names": "Esus4 / Asus2",
+            "pitch_classes": [
+              4,
+              9,
+              11
+            ]
+          },
+          "chord_56": {
+            "names": "E7",
+            "pitch_classes": [
+              2,
+              4,
+              8,
+              11
+            ]
+          },
+          "chord_57": {
+            "names": "Emaj7",
+            "pitch_classes": [
+              3,
+              4,
+              8,
+              11
+            ]
+          },
+          "chord_58": {
+            "names": "Em7",
+            "pitch_classes": [
+              2,
+              4,
+              7,
+              11
+            ]
+          },
+          "chord_59": {
+            "names": "Ehalf-dim7",
+            "pitch_classes": [
+              2,
+              4,
+              7,
+              10
+            ]
+          },
+          "chord_60": {
+            "names": "EmMaj7",
+            "pitch_classes": [
+              3,
+              4,
+              7,
+              11
+            ]
+          },
+          "chord_61": {
+            "names": "Eaug7",
+            "pitch_classes": [
+              0,
+              2,
+              4,
+              8
+            ]
+          },
+          "chord_62": {
+            "names": "FM",
+            "pitch_classes": [
+              0,
+              5,
+              9
+            ]
+          },
+          "chord_63": {
+            "names": "Fm",
+            "pitch_classes": [
+              0,
+              5,
+              8
+            ]
+          },
+          "chord_64": {
+            "names": "Fdim",
+            "pitch_classes": [
+              5,
+              8,
+              11
+            ]
+          },
+          "chord_65": {
+            "names": "Fsus4 / A#sus2",
+            "pitch_classes": [
+              0,
+              5,
+              10
+            ]
+          },
+          "chord_66": {
+            "names": "F7",
+            "pitch_classes": [
+              0,
+              3,
+              5,
+              9
+            ]
+          },
+          "chord_67": {
+            "names": "Fmaj7",
+            "pitch_classes": [
+              0,
+              4,
+              5,
+              9
+            ]
+          },
+          "chord_68": {
+            "names": "Fm7",
+            "pitch_classes": [
+              0,
+              3,
+              5,
+              8
+            ]
+          },
+          "chord_69": {
+            "names": "Fhalf-dim7",
+            "pitch_classes": [
+              3,
+              5,
+              8,
+              11
+            ]
+          },
+          "chord_70": {
+            "names": "FmMaj7",
+            "pitch_classes": [
+              0,
+              4,
+              5,
+              8
+            ]
+          },
+          "chord_71": {
+            "names": "Faug7",
+            "pitch_classes": [
+              1,
+              3,
+              5,
+              9
+            ]
+          },
+          "chord_72": {
+            "names": "F#M",
+            "pitch_classes": [
+              1,
+              6,
+              10
+            ]
+          },
+          "chord_73": {
+            "names": "F#m",
+            "pitch_classes": [
+              1,
+              6,
+              9
+            ]
+          },
+          "chord_74": {
+            "names": "F#dim",
+            "pitch_classes": [
+              0,
+              6,
+              9
+            ]
+          },
+          "chord_75": {
+            "names": "F#sus4 / Bsus2",
+            "pitch_classes": [
+              1,
+              6,
+              11
+            ]
+          },
+          "chord_76": {
+            "names": "F#7",
+            "pitch_classes": [
+              1,
+              4,
+              6,
+              10
+            ]
+          },
+          "chord_77": {
+            "names": "F#maj7",
+            "pitch_classes": [
+              1,
+              5,
+              6,
+              10
+            ]
+          },
+          "chord_78": {
+            "names": "F#m7",
+            "pitch_classes": [
+              1,
+              4,
+              6,
+              9
+            ]
+          },
+          "chord_79": {
+            "names": "F#half-dim7",
+            "pitch_classes": [
+              0,
+              4,
+              6,
+              9
+            ]
+          },
+          "chord_80": {
+            "names": "F#mMaj7",
+            "pitch_classes": [
+              1,
+              5,
+              6,
+              9
+            ]
+          },
+          "chord_81": {
+            "names": "F#aug7",
+            "pitch_classes": [
+              2,
+              4,
+              6,
+              10
+            ]
+          },
+          "chord_82": {
+            "names": "GM",
+            "pitch_classes": [
+              2,
+              7,
+              11
+            ]
+          },
+          "chord_83": {
+            "names": "Gm",
+            "pitch_classes": [
+              2,
+              7,
+              10
+            ]
+          },
+          "chord_84": {
+            "names": "Gdim",
+            "pitch_classes": [
+              1,
+              7,
+              10
+            ]
+          },
+          "chord_85": {
+            "names": "G7",
+            "pitch_classes": [
+              2,
+              5,
+              7,
+              11
+            ]
+          },
+          "chord_86": {
+            "names": "Gmaj7",
+            "pitch_classes": [
+              2,
+              6,
+              7,
+              11
+            ]
+          },
+          "chord_87": {
+            "names": "Gm7",
+            "pitch_classes": [
+              2,
+              5,
+              7,
+              10
+            ]
+          },
+          "chord_88": {
+            "names": "Ghalf-dim7",
+            "pitch_classes": [
+              1,
+              5,
+              7,
+              10
+            ]
+          },
+          "chord_89": {
+            "names": "GmMaj7",
+            "pitch_classes": [
+              2,
+              6,
+              7,
+              10
+            ]
+          },
+          "chord_90": {
+            "names": "Gaug7",
+            "pitch_classes": [
+              3,
+              5,
+              7,
+              11
+            ]
+          },
+          "chord_91": {
+            "names": "G#M",
+            "pitch_classes": [
+              0,
+              3,
+              8
+            ]
+          },
+          "chord_92": {
+            "names": "G#m",
+            "pitch_classes": [
+              3,
+              8,
+              11
+            ]
+          },
+          "chord_93": {
+            "names": "G#dim",
+            "pitch_classes": [
+              2,
+              8,
+              11
+            ]
+          },
+          "chord_94": {
+            "names": "G#7",
+            "pitch_classes": [
+              0,
+              3,
+              6,
+              8
+            ]
+          },
+          "chord_95": {
+            "names": "G#maj7",
+            "pitch_classes": [
+              0,
+              3,
+              7,
+              8
+            ]
+          },
+          "chord_96": {
+            "names": "G#m7",
+            "pitch_classes": [
+              3,
+              6,
+              8,
+              11
+            ]
+          },
+          "chord_97": {
+            "names": "G#half-dim7",
+            "pitch_classes": [
+              2,
+              6,
+              8,
+              11
+            ]
+          },
+          "chord_98": {
+            "names": "G#mMaj7",
+            "pitch_classes": [
+              3,
+              7,
+              8,
+              11
+            ]
+          },
+          "chord_99": {
+            "names": "G#aug7",
+            "pitch_classes": [
+              0,
+              4,
+              6,
+              8
+            ]
+          },
+          "chord_100": {
+            "names": "AM",
+            "pitch_classes": [
+              1,
+              4,
+              9
+            ]
+          },
+          "chord_101": {
+            "names": "Am",
+            "pitch_classes": [
+              0,
+              4,
+              9
+            ]
+          },
+          "chord_102": {
+            "names": "Adim",
+            "pitch_classes": [
+              0,
+              3,
+              9
+            ]
+          },
+          "chord_103": {
+            "names": "A7",
+            "pitch_classes": [
+              1,
+              4,
+              7,
+              9
+            ]
+          },
+          "chord_104": {
+            "names": "Amaj7",
+            "pitch_classes": [
+              1,
+              4,
+              8,
+              9
+            ]
+          },
+          "chord_105": {
+            "names": "Am7",
+            "pitch_classes": [
+              0,
+              4,
+              7,
+              9
+            ]
+          },
+          "chord_106": {
+            "names": "Ahalf-dim7",
+            "pitch_classes": [
+              0,
+              3,
+              7,
+              9
+            ]
+          },
+          "chord_107": {
+            "names": "AmMaj7",
+            "pitch_classes": [
+              0,
+              4,
+              8,
+              9
+            ]
+          },
+          "chord_108": {
+            "names": "Aaug7",
+            "pitch_classes": [
+              1,
+              5,
+              7,
+              9
+            ]
+          },
+          "chord_109": {
+            "names": "A#M",
+            "pitch_classes": [
+              2,
+              5,
+              10
+            ]
+          },
+          "chord_110": {
+            "names": "A#m",
+            "pitch_classes": [
+              1,
+              5,
+              10
+            ]
+          },
+          "chord_111": {
+            "names": "A#dim",
+            "pitch_classes": [
+              1,
+              4,
+              10
+            ]
+          },
+          "chord_112": {
+            "names": "A#7",
+            "pitch_classes": [
+              2,
+              5,
+              8,
+              10
+            ]
+          },
+          "chord_113": {
+            "names": "A#maj7",
+            "pitch_classes": [
+              2,
+              5,
+              9,
+              10
+            ]
+          },
+          "chord_114": {
+            "names": "A#m7",
+            "pitch_classes": [
+              1,
+              5,
+              8,
+              10
+            ]
+          },
+          "chord_115": {
+            "names": "A#half-dim7",
+            "pitch_classes": [
+              1,
+              4,
+              8,
+              10
+            ]
+          },
+          "chord_116": {
+            "names": "A#mMaj7",
+            "pitch_classes": [
+              1,
+              5,
+              9,
+              10
+            ]
+          },
+          "chord_117": {
+            "names": "A#aug7",
+            "pitch_classes": [
+              2,
+              6,
+              8,
+              10
+            ]
+          },
+          "chord_118": {
+            "names": "BM",
+            "pitch_classes": [
+              3,
+              6,
+              11
+            ]
+          },
+          "chord_119": {
+            "names": "Bm",
+            "pitch_classes": [
+              2,
+              6,
+              11
+            ]
+          },
+          "chord_120": {
+            "names": "Bdim",
+            "pitch_classes": [
+              2,
+              5,
+              11
+            ]
+          },
+          "chord_121": {
+            "names": "B7",
+            "pitch_classes": [
+              3,
+              6,
+              9,
+              11
+            ]
+          },
+          "chord_122": {
+            "names": "Bmaj7",
+            "pitch_classes": [
+              3,
+              6,
+              10,
+              11
+            ]
+          },
+          "chord_123": {
+            "names": "Bm7",
+            "pitch_classes": [
+              2,
+              6,
+              9,
+              11
+            ]
+          },
+          "chord_124": {
+            "names": "Bhalf-dim7",
+            "pitch_classes": [
+              2,
+              5,
+              9,
+              11
+            ]
+          },
+          "chord_125": {
+            "names": "BmMaj7",
+            "pitch_classes": [
+              2,
+              6,
+              10,
+              11
+            ]
+          },
+          "chord_126": {
+            "names": "Baug7",
+            "pitch_classes": [
+              3,
+              7,
+              9,
+              11
+            ]
+          },
+          "chord_127": "No chord sounding at the target beat.",
+          "chord_128": "A chord pitch-class set outside this vocabulary."
+        }
+      },
+      "components": [
+        {
+          "keys": [
+            "chord_0",
+            "chord_1",
+            "chord_2",
+            "chord_3",
+            "chord_4",
+            "chord_5",
+            "chord_6",
+            "chord_7",
+            "chord_8",
+            "chord_9",
+            "chord_10",
+            "chord_11",
+            "chord_12",
+            "chord_13",
+            "chord_14",
+            "chord_15",
+            "chord_16",
+            "chord_17",
+            "chord_18",
+            "chord_19",
+            "chord_20",
+            "chord_21",
+            "chord_22",
+            "chord_23",
+            "chord_24",
+            "chord_25"
+          ],
+          "logprobs": {
+            "chord_0": -3.3030927181243896,
+            "chord_1": -2.6780927181243896,
+            "chord_2": -3.9280927181243896,
+            "chord_3": -2.4280927181243896,
+            "chord_4": -3.3030927181243896,
+            "chord_5": -3.4280927181243896,
+            "chord_6": -3.4280927181243896,
+            "chord_7": -2.8030927181243896,
+            "chord_8": -2.6780927181243896,
+            "chord_9": -4.053092956542969,
+            "chord_10": -3.9280927181243896,
+            "chord_11": -4.053092956542969,
+            "chord_12": -3.1780927181243896,
+            "chord_13": -1.5530927181243896,
+            "chord_14": -3.8030927181243896,
+            "chord_15": -3.8030927181243896,
+            "chord_16": -3.6780927181243896,
+            "chord_17": -4.178092956542969,
+            "chord_18": -3.8030927181243896,
+            "chord_19": -3.1780927181243896,
+            "chord_20": -4.803092956542969,
+            "chord_21": -3.8030927181243896,
+            "chord_22": -4.678092956542969,
+            "chord_23": -3.0530927181243896,
+            "chord_24": -5.803092956542969,
+            "chord_25": -4.803092956542969
+          },
+          "probabilities": {
+            "chord_0": 0.036790781907363714,
+            "chord_1": 0.0687342295692028,
+            "chord_2": 0.01969268648006612,
+            "chord_3": 0.0882564977633065,
+            "chord_4": 0.036790781907363714,
+            "chord_5": 0.032467751076913846,
+            "chord_6": 0.032467751076913846,
+            "chord_7": 0.060657744696359976,
+            "chord_8": 0.0687342295692028,
+            "chord_9": 0.01737873067881512,
+            "chord_10": 0.01969268648006612,
+            "chord_11": 0.01737873067881512,
+            "chord_12": 0.04168941760544817,
+            "chord_13": 0.21171633201645843,
+            "chord_14": 0.022314737221616927,
+            "chord_15": 0.022314737221616927,
+            "chord_16": 0.025285909963267954,
+            "chord_17": 0.015336675994906226,
+            "chord_18": 0.022314737221616927,
+            "chord_19": 0.04168941760544817,
+            "chord_20": 0.008209131101766413,
+            "chord_21": 0.022314737221616927,
+            "chord_22": 0.009302164208989383,
+            "chord_23": 0.047240299068870506,
+            "chord_24": 0.0030199705622209346,
+            "chord_25": 0.008209131101766413
+          },
+          "prompt_sha256": "7502db2a3afcc0ada151a1bc4793956fb69e19c83649256e6bc29c476f950e9c",
+          "prompt_tokens": 3134,
+          "requests": 1,
+          "missing_from_top": [],
+          "ranks": {},
+          "sampled": "N",
+          "elapsed_ms": 0.0
+        },
+        {
+          "keys": [
+            "chord_26",
+            "chord_27",
+            "chord_28",
+            "chord_29",
+            "chord_30",
+            "chord_31",
+            "chord_32",
+            "chord_33",
+            "chord_34",
+            "chord_35",
+            "chord_36",
+            "chord_37",
+            "chord_38",
+            "chord_39",
+            "chord_40",
+            "chord_41",
+            "chord_42",
+            "chord_43",
+            "chord_44",
+            "chord_45",
+            "chord_46",
+            "chord_47",
+            "chord_48",
+            "chord_49",
+            "chord_50",
+            "chord_51"
+          ],
+          "logprobs": {
+            "chord_26": -2.218762159347534,
+            "chord_27": -1.5937621593475342,
+            "chord_28": -2.843762159347534,
+            "chord_29": -1.5937621593475342,
+            "chord_30": -3.218762159347534,
+            "chord_31": -4.718762397766113,
+            "chord_32": -4.343762397766113,
+            "chord_33": -2.718762159347534,
+            "chord_34": -3.343762159347534,
+            "chord_35": -4.718762397766113,
+            "chord_36": -3.843762159347534,
+            "chord_37": -3.468762159347534,
+            "chord_38": -3.593762159347534,
+            "chord_39": -3.718762159347534,
+            "chord_40": -3.218762159347534,
+            "chord_41": -3.968762159347534,
+            "chord_42": -4.843762397766113,
+            "chord_43": -3.343762159347534,
+            "chord_44": -4.593762397766113,
+            "chord_45": -4.843762397766113,
+            "chord_46": -5.093762397766113,
+            "chord_47": -4.593762397766113,
+            "chord_48": -5.218762397766113,
+            "chord_49": -5.468762397766113,
+            "chord_50": -6.843762397766113,
+            "chord_51": -5.843762397766113
+          },
+          "probabilities": {
+            "chord_26": 0.10878493353044204,
+            "chord_27": 0.20323701229778135,
+            "chord_28": 0.0582283789228478,
+            "chord_29": 0.20323701229778135,
+            "chord_30": 0.04001974055505152,
+            "chord_31": 0.008929608990162315,
+            "chord_32": 0.012992504416583674,
+            "chord_33": 0.06598139750101398,
+            "chord_34": 0.035317297082072076,
+            "chord_35": 0.008929608990162315,
+            "chord_36": 0.02142102349845624,
+            "chord_37": 0.03116740528258858,
+            "chord_38": 0.027505138623483177,
+            "chord_39": 0.024273199640383825,
+            "chord_40": 0.04001974055505152,
+            "chord_41": 0.018903986887579466,
+            "chord_42": 0.0078803522751098,
+            "chord_43": 0.035317297082072076,
+            "chord_44": 0.010118572613694051,
+            "chord_45": 0.0078803522751098,
+            "chord_46": 0.006137224522734039,
+            "chord_47": 0.010118572613694051,
+            "chord_48": 0.005416081631779011,
+            "chord_49": 0.004218048616008146,
+            "chord_50": 0.0010664897071562698,
+            "chord_51": 0.002899019591201497
+          },
+          "prompt_sha256": "eab4a7ef8ee03e5efa5477d18742fac57b0c894d36e320d2030e10e0775f8279",
+          "prompt_tokens": 3117,
+          "requests": 1,
+          "missing_from_top": [],
+          "ranks": {},
+          "sampled": "D",
+          "elapsed_ms": 0.0
+        },
+        {
+          "keys": [
+            "chord_52",
+            "chord_53",
+            "chord_54",
+            "chord_55",
+            "chord_56",
+            "chord_57",
+            "chord_58",
+            "chord_59",
+            "chord_60",
+            "chord_61",
+            "chord_62",
+            "chord_63",
+            "chord_64",
+            "chord_65",
+            "chord_66",
+            "chord_67",
+            "chord_68",
+            "chord_69",
+            "chord_70",
+            "chord_71",
+            "chord_72",
+            "chord_73",
+            "chord_74",
+            "chord_75",
+            "chord_76",
+            "chord_77"
+          ],
+          "logprobs": {
+            "chord_52": -2.022542953491211,
+            "chord_53": -1.647542953491211,
+            "chord_54": -2.647542953491211,
+            "chord_55": -2.147542953491211,
+            "chord_56": -2.897542953491211,
+            "chord_57": -4.147542953491211,
+            "chord_58": -3.522542953491211,
+            "chord_59": -2.772542953491211,
+            "chord_60": -3.522542953491211,
+            "chord_61": -3.272542953491211,
+            "chord_62": -3.397542953491211,
+            "chord_63": -2.647542953491211,
+            "chord_64": -4.397542953491211,
+            "chord_65": -3.272542953491211,
+            "chord_66": -5.022542953491211,
+            "chord_67": -3.772542953491211,
+            "chord_68": -4.647542953491211,
+            "chord_69": -4.772542953491211,
+            "chord_70": -3.647542953491211,
+            "chord_71": -4.897542953491211,
+            "chord_72": -5.522542953491211,
+            "chord_73": -5.147542953491211,
+            "chord_74": -5.397542953491211,
+            "chord_75": -5.772542953491211,
+            "chord_76": -6.647542953491211,
+            "chord_77": -6.147542953491211
+          },
+          "probabilities": {
+            "chord_52": 0.13239964241262114,
+            "chord_53": 0.1926403430088836,
+            "chord_54": 0.07086842173318307,
+            "chord_55": 0.11684227433244618,
+            "chord_56": 0.055192382340837544,
+            "chord_57": 0.015812882290791606,
+            "chord_58": 0.029542353415122995,
+            "chord_59": 0.06254116267059288,
+            "chord_60": 0.029542353415122995,
+            "chord_61": 0.03793313265378983,
+            "chord_62": 0.0334758720723001,
+            "chord_63": 0.07086842173318307,
+            "chord_64": 0.012315085110684451,
+            "chord_65": 0.03793313265378983,
+            "chord_66": 0.0065917900486779065,
+            "chord_67": 0.02300760797346998,
+            "chord_68": 0.00959099792779205,
+            "chord_69": 0.008464025963971757,
+            "chord_70": 0.02607103538390549,
+            "chord_71": 0.00746947669660067,
+            "chord_72": 0.003998122766911783,
+            "chord_73": 0.005817234300446212,
+            "chord_74": 0.004530466628497346,
+            "chord_75": 0.003113741141686508,
+            "chord_76": 0.0012980004210795023,
+            "chord_77": 0.0021400409036114987
+          },
+          "prompt_sha256": "6122d2e922faa6f2015c2cfcc3021942f44c012b47ac55a0e701e51a64f21c59",
+          "prompt_tokens": 3089,
+          "requests": 1,
+          "missing_from_top": [],
+          "ranks": {},
+          "sampled": "B",
+          "elapsed_ms": 0.0
+        },
+        {
+          "keys": [
+            "chord_78",
+            "chord_79",
+            "chord_80",
+            "chord_81",
+            "chord_82",
+            "chord_83",
+            "chord_84",
+            "chord_85",
+            "chord_86",
+            "chord_87",
+            "chord_88",
+            "chord_89",
+            "chord_90",
+            "chord_91",
+            "chord_92",
+            "chord_93",
+            "chord_94",
+            "chord_95",
+            "chord_96",
+            "chord_97",
+            "chord_98",
+            "chord_99",
+            "chord_100",
+            "chord_101",
+            "chord_102",
+            "chord_103"
+          ],
+          "logprobs": {
+            "chord_78": -1.772074818611145,
+            "chord_79": -1.897074818611145,
+            "chord_80": -1.772074818611145,
+            "chord_81": -2.0220746994018555,
+            "chord_82": -3.6470746994018555,
+            "chord_83": -3.6470746994018555,
+            "chord_84": -3.7720746994018555,
+            "chord_85": -2.8970746994018555,
+            "chord_86": -4.0220746994018555,
+            "chord_87": -2.7720746994018555,
+            "chord_88": -2.6470746994018555,
+            "chord_89": -4.6470746994018555,
+            "chord_90": -4.8970746994018555,
+            "chord_91": -5.5220746994018555,
+            "chord_92": -5.8970746994018555,
+            "chord_93": -5.0220746994018555,
+            "chord_94": -5.8970746994018555,
+            "chord_95": -5.2720746994018555,
+            "chord_96": -4.5220746994018555,
+            "chord_97": -6.1470746994018555,
+            "chord_98": -6.1470746994018555,
+            "chord_99": -4.6470746994018555,
+            "chord_100": -4.2720746994018555,
+            "chord_101": -5.0220746994018555,
+            "chord_102": -6.5220746994018555,
+            "chord_103": -4.6470746994018555
+          },
+          "probabilities": {
+            "chord_78": 0.17021991844402554,
+            "chord_79": 0.150218550785055,
+            "chord_80": 0.17021991844402554,
+            "chord_81": 0.13256742158182497,
+            "chord_82": 0.02610407306117778,
+            "chord_83": 0.02610407306117778,
+            "chord_84": 0.023036763621331374,
+            "chord_85": 0.05526232310417184,
+            "chord_86": 0.017941049547723725,
+            "chord_87": 0.06262041593837145,
+            "chord_88": 0.07095822745096685,
+            "chord_89": 0.009603151810044584,
+            "chord_90": 0.007478942149616302,
+            "chord_91": 0.004003189258814509,
+            "chord_92": 0.0027513490585543907,
+            "chord_93": 0.0066001432816457616,
+            "chord_94": 0.0027513490585543907,
+            "chord_95": 0.005140196756129191,
+            "chord_96": 0.010881796618117914,
+            "chord_97": 0.002142752801304932,
+            "chord_98": 0.002142752801304932,
+            "chord_99": 0.009603151810044584,
+            "chord_100": 0.013972503436890112,
+            "chord_101": 0.0066001432816457616,
+            "chord_102": 0.0014726910274362021,
+            "chord_103": 0.009603151810044584
+          },
+          "prompt_sha256": "b924d26ee091443bdf2b00a481b745b7d459719c5d2493d55bd4ce673508bbf2",
+          "prompt_tokens": 3088,
+          "requests": 1,
+          "missing_from_top": [],
+          "ranks": {},
+          "sampled": "A",
+          "elapsed_ms": 0.0
+        },
+        {
+          "keys": [
+            "chord_104",
+            "chord_105",
+            "chord_106",
+            "chord_107",
+            "chord_108",
+            "chord_109",
+            "chord_110",
+            "chord_111",
+            "chord_112",
+            "chord_113",
+            "chord_114",
+            "chord_115",
+            "chord_116",
+            "chord_117",
+            "chord_118",
+            "chord_119",
+            "chord_120",
+            "chord_121",
+            "chord_122",
+            "chord_123",
+            "chord_124",
+            "chord_125",
+            "chord_126",
+            "chord_127",
+            "chord_128"
+          ],
+          "logprobs": {
+            "chord_104": -5.394700527191162,
+            "chord_105": -4.894700527191162,
+            "chord_106": -6.894700527191162,
+            "chord_107": -5.519700527191162,
+            "chord_108": -5.894700527191162,
+            "chord_109": -6.769700527191162,
+            "chord_110": -0.1447005271911621,
+            "chord_111": -3.894700527191162,
+            "chord_112": -6.644700527191162,
+            "chord_113": -7.269700527191162,
+            "chord_114": -3.269700527191162,
+            "chord_115": -7.144700527191162,
+            "chord_116": -5.894700527191162,
+            "chord_117": -7.894700527191162,
+            "chord_118": -9.89470100402832,
+            "chord_119": -7.644700527191162,
+            "chord_120": -8.89470100402832,
+            "chord_121": -7.394700527191162,
+            "chord_122": -7.644700527191162,
+            "chord_123": -8.01970100402832,
+            "chord_124": -8.01970100402832,
+            "chord_125": -8.51970100402832,
+            "chord_126": -8.01970100402832,
+            "chord_127": -3.144700527191162,
+            "chord_128": -5.894700527191162
+          },
+          "probabilities": {
+            "chord_104": 0.0045438066794286575,
+            "chord_105": 0.007491470722323346,
+            "chord_106": 0.0010138603120644215,
+            "chord_107": 0.004009895320538985,
+            "chord_108": 0.002755958062880534,
+            "chord_109": 0.001148854244241649,
+            "chord_110": 0.8658962834961177,
+            "chord_111": 0.02036392873292451,
+            "chord_112": 0.0013018224096616824,
+            "chord_113": 0.0006968153226735462,
+            "chord_114": 0.0380448275327241,
+            "chord_115": 0.0007895952049607905,
+            "chord_116": 0.002755958062880534,
+            "chord_117": 0.0003729783650281635,
+            "chord_118": 5.0477108602848467e-05,
+            "chord_119": 0.00047891370057080024,
+            "chord_120": 0.00013721100706827672,
+            "chord_121": 0.00061493736393289,
+            "chord_122": 0.00047891370057080024,
+            "chord_123": 0.0003291520949164339,
+            "chord_124": 0.0003291520949164339,
+            "chord_125": 0.00019964083727546,
+            "chord_126": 0.0003291520949164339,
+            "chord_127": 0.043110437465900514,
+            "chord_128": 0.002755958062880534
+          },
+          "prompt_sha256": "c1b53a8fdeef6b3950f4bac18a333737fc93c51b81caf7d967b7241cc91bc5c9",
+          "prompt_tokens": 3035,
+          "requests": 1,
+          "missing_from_top": [],
+          "ranks": {},
+          "sampled": "G",
+          "elapsed_ms": 0.0
+        },
+        {
+          "keys": [
+            "chord_13",
+            "chord_27",
+            "chord_53",
+            "chord_78",
+            "chord_110"
+          ],
+          "logprobs": {
+            "chord_13": -3.9348695278167725,
+            "chord_27": -4.184869289398193,
+            "chord_53": -5.184869289398193,
+            "chord_78": -4.559869289398193,
+            "chord_110": -0.05986947566270828
+          },
+          "probabilities": {
+            "chord_13": 0.019691525094019335,
+            "chord_27": 0.015335778819426635,
+            "chord_53": 0.005641717742019512,
+            "chord_78": 0.0105401163645016,
+            "chord_110": 0.9487908619800329
+          },
+          "prompt_sha256": "5bebb3542bca95aeb8b89d077a9d285d819ef0c85dac7b31d40aa2fd2854a455",
+          "prompt_tokens": 2349,
+          "requests": 1,
+          "missing_from_top": [],
+          "ranks": {},
+          "sampled": "E",
+          "elapsed_ms": 0.0
+        }
+      ],
+      "expected": "chord_110",
+      "scores": {
+        "chord_0": 0.0,
+        "chord_1": 0.0,
+        "chord_2": 0.0,
+        "chord_3": 0.0,
+        "chord_4": 0.0,
+        "chord_5": 0.0,
+        "chord_6": 0.0,
+        "chord_7": 0.0,
+        "chord_8": 0.0,
+        "chord_9": 0.0,
+        "chord_10": 0.0,
+        "chord_11": 0.0,
+        "chord_12": 0.0,
+        "chord_13": 0.019691525094019335,
+        "chord_14": 0.0,
+        "chord_15": 0.0,
+        "chord_16": 0.0,
+        "chord_17": 0.0,
+        "chord_18": 0.0,
+        "chord_19": 0.0,
+        "chord_20": 0.0,
+        "chord_21": 0.0,
+        "chord_22": 0.0,
+        "chord_23": 0.0,
+        "chord_24": 0.0,
+        "chord_25": 0.0,
+        "chord_26": 0.0,
+        "chord_27": 0.015335778819426635,
+        "chord_28": 0.0,
+        "chord_29": 0.0,
+        "chord_30": 0.0,
+        "chord_31": 0.0,
+        "chord_32": 0.0,
+        "chord_33": 0.0,
+        "chord_34": 0.0,
+        "chord_35": 0.0,
+        "chord_36": 0.0,
+        "chord_37": 0.0,
+        "chord_38": 0.0,
+        "chord_39": 0.0,
+        "chord_40": 0.0,
+        "chord_41": 0.0,
+        "chord_42": 0.0,
+        "chord_43": 0.0,
+        "chord_44": 0.0,
+        "chord_45": 0.0,
+        "chord_46": 0.0,
+        "chord_47": 0.0,
+        "chord_48": 0.0,
+        "chord_49": 0.0,
+        "chord_50": 0.0,
+        "chord_51": 0.0,
+        "chord_52": 0.0,
+        "chord_53": 0.005641717742019512,
+        "chord_54": 0.0,
+        "chord_55": 0.0,
+        "chord_56": 0.0,
+        "chord_57": 0.0,
+        "chord_58": 0.0,
+        "chord_59": 0.0,
+        "chord_60": 0.0,
+        "chord_61": 0.0,
+        "chord_62": 0.0,
+        "chord_63": 0.0,
+        "chord_64": 0.0,
+        "chord_65": 0.0,
+        "chord_66": 0.0,
+        "chord_67": 0.0,
+        "chord_68": 0.0,
+        "chord_69": 0.0,
+        "chord_70": 0.0,
+        "chord_71": 0.0,
+        "chord_72": 0.0,
+        "chord_73": 0.0,
+        "chord_74": 0.0,
+        "chord_75": 0.0,
+        "chord_76": 0.0,
+        "chord_77": 0.0,
+        "chord_78": 0.0105401163645016,
+        "chord_79": 0.0,
+        "chord_80": 0.0,
+        "chord_81": 0.0,
+        "chord_82": 0.0,
+        "chord_83": 0.0,
+        "chord_84": 0.0,
+        "chord_85": 0.0,
+        "chord_86": 0.0,
+        "chord_87": 0.0,
+        "chord_88": 0.0,
+        "chord_89": 0.0,
+        "chord_90": 0.0,
+        "chord_91": 0.0,
+        "chord_92": 0.0,
+        "chord_93": 0.0,
+        "chord_94": 0.0,
+        "chord_95": 0.0,
+        "chord_96": 0.0,
+        "chord_97": 0.0,
+        "chord_98": 0.0,
+        "chord_99": 0.0,
+        "chord_100": 0.0,
+        "chord_101": 0.0,
+        "chord_102": 0.0,
+        "chord_103": 0.0,
+        "chord_104": 0.0,
+        "chord_105": 0.0,
+        "chord_106": 0.0,
+        "chord_107": 0.0,
+        "chord_108": 0.0,
+        "chord_109": 0.0,
+        "chord_110": 0.9487908619800329,
+        "chord_111": 0.0,
+        "chord_112": 0.0,
+        "chord_113": 0.0,
+        "chord_114": 0.0,
+        "chord_115": 0.0,
+        "chord_116": 0.0,
+        "chord_117": 0.0,
+        "chord_118": 0.0,
+        "chord_119": 0.0,
+        "chord_120": 0.0,
+        "chord_121": 0.0,
+        "chord_122": 0.0,
+        "chord_123": 0.0,
+        "chord_124": 0.0,
+        "chord_125": 0.0,
+        "chord_126": 0.0,
+        "chord_127": 0.0,
+        "chord_128": 0.0
+      }
+    },
+    {
+      "id": "API-Bank-tool-selection:CancelRegistration-RecordHealthData-level-2-2:api-10",
+      "state": {
+        "dialogue": [
+          {
+            "role": "User",
+            "text": "Can you cancel my appointment with ID 56789012 for David Brown with Dr. Davis on April 10, 2023?"
+          },
+          {
+            "role": "AI",
+            "text": "Sure, I can help you with that."
+          },
+          {
+            "role": "API",
+            "api_name": "CancelRegistration",
+            "param_dict": {
+              "appointment_id": "56789012"
+            },
+            "result": {
+              "api_name": "CancelRegistration",
+              "input": {
+                "appointment_id": "56789012"
+              },
+              "output": "success",
+              "exception": null
+            }
+          },
+          {
+            "role": "AI",
+            "text": "Your appointment for David Brown with Dr. Davis on April 10, 2023 has been cancelled."
+          },
+          {
+            "role": "User",
+            "text": "Thank you."
+          },
+          {
+            "role": "AI",
+            "text": "Is there anything else I can help you with?"
+          },
+          {
+            "role": "User",
+            "text": "Yes, I would like to record my health data for today."
+          },
+          {
+            "role": "AI",
+            "text": "Sure, what is your user ID, time and health data?"
+          },
+          {
+            "role": "User",
+            "text": "My user ID is 123456, time is 2023-04-26 09:00:00, and health data is [{'name': 'blood_pressure', 'value': '130/90'}, {'name': 'heart_rate', 'value': '75'}]"
+          },
+          {
+            "role": "AI",
+            "text": "Great! I will submit this data for you."
+          }
+        ],
+        "available_tools": [
+          {
+            "name": "AddAgenda",
+            "description": "The API for adding a agenda item includes content, time and location.",
+            "input_parameters": {
+              "token": {
+                "type": "str",
+                "description": "User's token."
+              },
+              "content": {
+                "type": "str",
+                "description": "The content of the agenda."
+              },
+              "time": {
+                "type": "str",
+                "description": "The time for agenda. Format: %Y-%m-%d %H:%M:%S"
+              },
+              "location": {
+                "type": "str",
+                "description": "The location of the agenda."
+              }
+            },
+            "output_parameters": {
+              "status": {
+                "type": "str",
+                "description": "success or failed"
+              }
+            }
+          },
+          {
+            "name": "AddAlarm",
+            "description": "The API for setting an alarm includes a parameter for the alarm time.",
+            "input_parameters": {
+              "token": {
+                "type": "str",
+                "description": "User's token."
+              },
+              "time": {
+                "type": "str",
+                "description": "The time for alarm. Format: %Y-%m-%d %H:%M:%S"
+              }
+            },
+            "output_parameters": {
+              "status": {
+                "type": "str",
+                "description": "success or failed"
+              }
+            }
+          },
+          {
+            "name": "AddMeeting",
+            "description": "This API allows users to make a reservation for a meeting and store the meeting information (e.g., topic, time, location, attendees) in the database.",
+            "input_parameters": {
+              "token": {
+                "type": "str",
+                "description": "User's token."
+              },
+              "meeting_topic": {
+                "type": "str",
+                "description": "The title of the meeting, no more than 50 characters."
+              },
+              "start_time": {
+                "type": "str",
+                "description": "The start time of the meeting, in the pattern of %Y-%m-%d %H:%M:%S"
+              },
+              "end_time": {
+                "type": "str",
+                "description": "The end time of the meeting, in the pattern of %Y-%m-%d %H:%M:%S"
+              },
+              "location": {
+                "type": "str",
+                "description": "The location where the meeting to be held, no more than 100 characters."
+              },
+              "attendees": {
+                "type": "list(str)",
+                "description": "The attendees of the meeting, including names, positions and other information."
+              }
+            },
+            "output_parameters": {
+              "status": {
+                "type": "str",
+                "description": "success or failed"
+              }
+            }
+          },
+          {
+            "name": "AddReminder",
+            "description": "The API for adding a reminder item includes content and time.",
+            "input_parameters": {
+              "token": {
+                "type": "str",
+                "description": "User's token."
+              },
+              "content": {
+                "type": "str",
+                "description": "The content of the conference."
+              },
+              "time": {
+                "type": "str",
+                "description": "The time for conference. Format: %Y-%m-%d %H:%M:%S"
+              }
+            },
+            "output_parameters": {
+              "status": {
+                "type": "str",
+                "description": "success or failed"
+              }
+            }
+          },
+          {
+            "name": "AddScene",
+            "description": "This API adds a scene of smart home system, given the scene name and a list of smart devices",
+            "input_parameters": {
+              "name": {
+                "type": "str",
+                "description": "The name of the scene."
+              },
+              "devices": {
+                "type": "list",
+                "description": "The list of smart devices, containing the name and description. Format be like [{\"name\": \"light\", \"description\": \"Smart light in the kitchen\"}, {\"name\": \"oven\", \"description\": \"Smart oven in the kitchen\"}, {\"name\": \"range hood\", \"description\": \"Smart range hood in the kitchen\"}]"
+              }
+            },
+            "output_parameters": {
+              "status": {
+                "type": "str",
+                "description": "Whether succeed."
+              }
+            }
+          },
+          {
+            "name": "AppointmentRegistration",
+            "description": "This API registers an appointment of hospital.",
+            "input_parameters": {
+              "patient_name": {
+                "type": "str",
+                "description": "The name of patient."
+              },
+              "date": {
+                "type": "str",
+                "description": "The date of appointment. Format be like %Y-%m-%d"
+              },
+              "doctor_name": {
+                "type": "str",
+                "description": "The name of appointed doctor."
+              }
+            },
+            "output_parameters": {
+              "appointment_id": {
+                "type": "str",
+                "description": "The ID of appointment."
+              }
+            }
+          },
+          {
+            "name": "BookHotel",
+            "description": "This API orders a hotel room. Two rooms are ordered if the number of adults is greater than 2. Only one order can be made at same time.",
+            "input_parameters": {
+              "hotel_name": {
+                "type": "str",
+                "description": "The name of the hotel."
+              },
+              "check_in_time": {
+                "type": "str",
+                "description": "The time to check in. Format: %Y-%m-%d"
+              },
+              "check_out_time": {
+                "type": "str",
+                "description": "The time to check out. Format: %Y-%m-%d"
+              },
+              "room_count": {
+                "type": "int",
+                "description": "The number of rooms to order."
+              },
+              "adult_count": {
+                "type": "int",
+                "description": "The number of adults."
+              },
+              "child_count": {
+                "type": "int",
+                "description": "The number of children."
+              }
+            },
+            "output_parameters": {
+              "order_id": {
+                "type": "str",
+                "description": "The ID of the order."
+              }
+            }
+          },
+          {
+            "name": "Calculator",
+            "description": "This API provides basic arithmetic operations: addition, subtraction, multiplication, and division.",
+            "input_parameters": {
+              "formula": {
+                "type": "str",
+                "description": "The formula that needs to be calculated. Only integers are supported. Valid operators are +, -, *, /, and (, ). For example, '(1 + 2) * 3'."
+              }
+            },
+            "output_parameters": {
+              "result": {
+                "type": "float",
+                "description": "The result of the formula."
+              }
+            }
+          },
+          {
+            "name": "CancelRegistration",
+            "description": "This API cancels the registration of a patient given appointment ID.",
+            "input_parameters": {
+              "appointment_id": {
+                "type": "str",
+                "description": "The ID of appointment."
+              }
+            },
+            "output_parameters": {
+              "status": {
+                "type": "str",
+                "description": "The status of cancellation."
+              }
+            }
+          },
+          {
+            "name": "CancelTimedSwitch",
+            "description": "Cancels a timed switch for a smart device.",
+            "input_parameters": {
+              "name": {
+                "type": "str",
+                "description": "The name of the smart device."
+              },
+              "time": {
+                "type": "str",
+                "description": "The time to switch the device on or off. Format: %Y-%m-%d %H:%M:%S"
+              }
+            },
+            "output_parameters": {
+              "status": {
+                "type": "str",
+                "description": "Whether the time switch is successful."
+              }
+            }
+          },
+          {
+            "name": "CheckToken",
+            "description": "Check the user token.",
+            "input_parameters": {
+              "token": {
+                "type": "str",
+                "description": "The token of the user."
+              }
+            },
+            "output_parameters": {
+              "username": {
+                "type": "str",
+                "description": "The username of the user."
+              }
+            }
+          },
+          {
+            "name": "DeleteAccount",
+            "description": "Delete an account.",
+            "input_parameters": {
+              "token": {
+                "type": "str",
+                "description": "The token of the user."
+              }
+            },
+            "output_parameters": {
+              "status": {
+                "type": "str",
+                "description": "success or failed"
+              }
+            }
+          },
+          {
+            "name": "DeleteAgenda",
+            "description": "The API for deleting a schedule item includes parameters for token, content, time, and location.",
+            "input_parameters": {
+              "token": {
+                "type": "str",
+                "description": "User's token."
+              },
+              "content": {
+                "type": "str",
+                "description": "The content of the agenda."
+              },
+              "time": {
+                "type": "str",
+                "description": "The time for agenda. Format: %Y-%m-%d %H:%M:%S"
+              },
+              "location": {
+                "type": "str",
+                "description": "The location of the agenda."
+              }
+            },
+            "output_parameters": {
+              "status": {
+                "type": "str",
+                "description": "success or failed"
+              }
+            }
+          },
+          {
+            "name": "DeleteAlarm",
+            "description": "The API for removing an alarm includes a parameter for the time.",
+            "input_parameters": {
+              "token": {
+                "type": "str",
+                "description": "User's token."
+              },
+              "time": {
+                "type": "str",
+                "description": "The time for alarm. Format: %Y-%m-%d %H:%M:%S"
+              }
+            },
+            "output_parameters": {
+              "status": {
+                "type": "str",
+                "description": "success or failed"
+              }
+            }
+          },
+          {
+            "name": "DeleteMeeting",
+            "description": "This API allows users to delete a reservation for a meeting and remove the meeting information in the database.",
+            "input_parameters": {
+              "token": {
+                "type": "str",
+                "description": "User's token."
+              },
+              "meeting_topic": {
+                "type": "str",
+                "description": "The title of the meeting, no more than 50 characters."
+              },
+              "start_time": {
+                "type": "str",
+                "description": "The start time of the meeting, in the pattern of %Y-%m-%d %H:%M:%S"
+              },
+              "end_time": {
+                "type": "str",
+                "description": "The end time of the meeting, in the pattern of %Y-%m-%d %H:%M:%S"
+              },
+              "location": {
+                "type": "str",
+                "description": "The location where the meeting to be held, no more than 100 characters."
+              },
+              "attendees": {
+                "type": "list(str)",
+                "description": "The attendees of the meeting, including names, positions and other information."
+              }
+            },
+            "output_parameters": {
+              "status": {
+                "type": "str",
+                "description": "success or failed"
+              }
+            }
+          },
+          {
+            "name": "DeleteReminder",
+            "description": "The API for deleting a reminder item includes content and time.",
+            "input_parameters": {
+              "token": {
+                "type": "str",
+                "description": "User's token."
+              },
+              "content": {
+                "type": "str",
+                "description": "The content of the conference."
+              },
+              "time": {
+                "type": "str",
+                "description": "The time for conference. Format: %Y-%m-%d %H:%M:%S"
+              }
+            },
+            "output_parameters": {
+              "status": {
+                "type": "str",
+                "description": "success or failed"
+              }
+            }
+          },
+          {
+            "name": "DeleteScene",
+            "description": "This API deletes a scene by its name.",
+            "input_parameters": {
+              "name": {
+                "type": "str",
+                "description": "The name of the scene."
+              }
+            },
+            "output_parameters": {
+              "status": {
+                "type": "str",
+                "description": "Whether the deletion is successful."
+              }
+            }
+          },
+          {
+            "name": "Dictionary",
+            "description": "This API searches the dictionary for a given keyword.",
+            "input_parameters": {
+              "keyword": {
+                "type": "str",
+                "description": "The keyword to search."
+              }
+            },
+            "output_parameters": {
+              "results": {
+                "type": "list",
+                "description": "The list of results. Format be like [{\"partOfSpeech\": \"xxx\", \"definitions\": [{\"definition\": \"xxx\", \"example\": \"xxx\", \"synonyms\": [\"xxx\", \"xxx\"]}, ...]"
+              }
+            }
+          },
+          {
+            "name": "DocumentQA",
+            "description": "This API answers the question from a given document url.",
+            "input_parameters": {
+              "url": {
+                "type": "str",
+                "description": "The url to download the document. It should end with .txt."
+              },
+              "question": {
+                "type": "str",
+                "description": "The question to be answered."
+              }
+            },
+            "output_parameters": {
+              "answer": {
+                "type": "str",
+                "description": "The answer to the question."
+              }
+            }
+          },
+          {
+            "name": "EmergencyKnowledge",
+            "description": "This API searches for a given symptom for emergency knowledge.",
+            "input_parameters": {
+              "symptom": {
+                "type": "str",
+                "description": "The symptom to search."
+              }
+            },
+            "output_parameters": {
+              "results": {
+                "type": "list",
+                "description": "The list of results. Format be like [{\"name\":possible disease name, \"aid\": first-aid method},...]"
+              }
+            }
+          },
+          {
+            "name": "ForgotPassword",
+            "description": "Sends an email to the user with a link to reset the password. Need call twice, first with 'Forgot Password' status to get the verification code, then call again with 'Verification Code' status to change the password. Must pass the name of the parameters when calling the API, like ForgotPassword(status='Forgot Password', username='username').",
+            "input_parameters": {
+              "status": {
+                "type": "str",
+                "description": "'Forgot Password' for first call, after get the verification code, call again with 'Verification Code' to change the password."
+              },
+              "username": {
+                "type": "str",
+                "description": "The username of the user. Only needed for the first call."
+              },
+              "email": {
+                "type": "str",
+                "description": "The email of the user. Only needed for the first call."
+              },
+              "verification_code": {
+                "type": "int",
+                "description": "The verification code sent to the user. Only needed for the second call."
+              },
+              "new_password": {
+                "type": "str",
+                "description": "The new password of the user. Only needed for the second call."
+              }
+            },
+            "output_parameters": {
+              "status": {
+                "type": "str",
+                "description": "success or failed"
+              }
+            }
+          },
+          {
+            "name": "GetToday",
+            "description": "This API gets the current date.",
+            "input_parameters": {},
+            "output_parameters": {
+              "date": {
+                "type": "str",
+                "description": "The current date. Format: %Y-%m-%d"
+              }
+            }
+          },
+          {
+            "name": "GetUserToken",
+            "description": "Get the user token by username and password.",
+            "input_parameters": {
+              "username": {
+                "type": "str",
+                "description": "The username of the user."
+              },
+              "password": {
+                "type": "str",
+                "description": "The password of the user."
+              }
+            },
+            "output_parameters": {
+              "token": {
+                "type": "str",
+                "description": "The token of the user."
+              }
+            }
+          },
+          {
+            "name": "ImageCaption",
+            "description": "This API generates a caption for a given image.",
+            "input_parameters": {
+              "url": {
+                "type": "str",
+                "description": "The url to download the image. It should end with .jpg, .jpeg or .png."
+              }
+            },
+            "output_parameters": {
+              "caption": {
+                "type": "str",
+                "description": "The generated caption."
+              }
+            }
+          },
+          {
+            "name": "ModifyAgenda",
+            "description": "The API for modifying a schedule item includes parameters for content, time, and location.",
+            "input_parameters": {
+              "token": {
+                "type": "str",
+                "description": "User's token."
+              },
+              "content": {
+                "type": "str",
+                "description": "The content of the agenda."
+              },
+              "time": {
+                "type": "str",
+                "description": "The new time for agenda. Format: %Y-%m-%d %H:%M:%S"
+              },
+              "location": {
+                "type": "str",
+                "description": "The new location of the agenda."
+              }
+            },
+            "output_parameters": {
+              "status": {
+                "type": "str",
+                "description": "success or failed"
+              }
+            }
+          },
+          {
+            "name": "ModifyAlarm",
+            "description": "The API for modifying an alarm includes a parameter for the from_time to to_time.",
+            "input_parameters": {
+              "token": {
+                "type": "str",
+                "description": "User's token."
+              },
+              "from_time": {
+                "type": "str",
+                "description": "The time for alarm which changed from. Format: %Y-%m-%d %H:%M:%S"
+              },
+              "to_time": {
+                "type": "str",
+                "description": "The time for alarm which changed to. Format: %Y-%m-%d %H:%M:%S"
+              }
+            },
+            "output_parameters": {
+              "status": {
+                "type": "str",
+                "description": "success or failed"
+              }
+            }
+          },
+          {
+            "name": "ModifyMeeting",
+            "description": "This API allows users to modify a reservation for a meeting",
+            "input_parameters": {
+              "token": {
+                "type": "str",
+                "description": "User's token."
+              },
+              "meeting_topic": {
+                "type": "str",
+                "description": "The title of the meeting, no more than 50 characters."
+              },
+              "start_time": {
+                "type": "str",
+                "description": "The start time of the meeting, in the pattern of %Y-%m-%d %H:%M:%S"
+              },
+              "end_time": {
+                "type": "str",
+                "description": "The end time of the meeting, in the pattern of %Y-%m-%d %H:%M:%S"
+              },
+              "location": {
+                "type": "str",
+                "description": "The location where the meeting to be held, no more than 100 characters."
+              },
+              "attendees": {
+                "type": "list(str)",
+                "description": "The attendees of the meeting, including names, positions and other information."
+              }
+            },
+            "output_parameters": {
+              "status": {
+                "type": "str",
+                "description": "success or failed"
+              }
+            }
+          },
+          {
+            "name": "ModifyPassword",
+            "description": "The API for modifying the password of the account.",
+            "input_parameters": {
+              "token": {
+                "type": "str",
+                "description": "The token of the user."
+              },
+              "old_password": {
+                "type": "str",
+                "description": "The old password of the user."
+              },
+              "new_password": {
+                "type": "str",
+                "description": "The new password of the user."
+              }
+            },
+            "output_parameters": {
+              "status": {
+                "type": "str",
+                "description": "success or failed"
+              }
+            }
+          },
+          {
+            "name": "ModifyRegistration",
+            "description": "This API modifies the registration of a patient given appointment ID.",
+            "input_parameters": {
+              "appointment_id": {
+                "type": "str",
+                "description": "The ID of appointment."
+              },
+              "new_appointment_date": {
+                "type": "str",
+                "description": "The new appointment date. Format: %Y-%m-%d."
+              },
+              "new_appointment_doctor": {
+                "type": "str",
+                "description": "The new appointment doctor."
+              }
+            },
+            "output_parameters": {
+              "status": {
+                "type": "str",
+                "description": "The status of modification."
+              }
+            }
+          },
+          {
+            "name": "ModifyReminder",
+            "description": "The API for deleting a reminder item includes content and time.",
+            "input_parameters": {
+              "token": {
+                "type": "str",
+                "description": "User's token."
+              },
+              "content": {
+                "type": "str",
+                "description": "The content of the conference."
+              },
+              "time": {
+                "type": "str",
+                "description": "The time for conference. Format: %Y-%m-%d %H:%M:%S"
+              }
+            },
+            "output_parameters": {
+              "status": {
+                "type": "str",
+                "description": "success or failed"
+              }
+            }
+          },
+          {
+            "name": "ModifyScene",
+            "description": "This API modifies a scene of smart home system, given the scene name and a list of smart devices",
+            "input_parameters": {
+              "name": {
+                "type": "str",
+                "description": "The name of the scene."
+              },
+              "devices": {
+                "type": "list",
+                "description": "The list of smart devices, containing the name and description."
+              }
+            },
+            "output_parameters": {
+              "status": {
+                "type": "str",
+                "description": "Whether the modification is successful."
+              }
+            }
+          },
+          {
+            "name": "OpenBankAccount",
+            "description": "This is an API for opening a bank account for a user, given the account, password and name.",
+            "input_parameters": {
+              "account": {
+                "type": "str",
+                "description": "The account for the user."
+              },
+              "password": {
+                "type": "str",
+                "description": "The password."
+              },
+              "name": {
+                "type": "str",
+                "description": "account holder name."
+              }
+            },
+            "output_parameters": {
+              "status": {
+                "type": "str",
+                "description": "success or failed"
+              }
+            }
+          },
+          {
+            "name": "PlayMusic",
+            "description": "This API triggers a music player to play music.",
+            "input_parameters": {
+              "music_name": {
+                "type": "str",
+                "description": "The name of the music to play."
+              }
+            },
+            "output_parameters": {
+              "status": {
+                "type": "str",
+                "description": "The corresponding url scheme to trigger the music player."
+              }
+            }
+          },
+          {
+            "name": "QueryAgenda",
+            "description": "The API for getting a schedule item includes parameters for token, content, time, and location.",
+            "input_parameters": {
+              "token": {
+                "type": "str",
+                "description": "User's token."
+              },
+              "content": {
+                "type": "str",
+                "description": "The content of the agenda."
+              },
+              "time": {
+                "type": "str",
+                "description": "The time for agenda. Format: %Y-%m-%d %H:%M:%S"
+              },
+              "location": {
+                "type": "str",
+                "description": "The location of the agenda."
+              }
+            },
+            "output_parameters": {
+              "info": {
+                "type": "json",
+                "description": "agenda info including username and time"
+              }
+            }
+          },
+          {
+            "name": "QueryAlarm",
+            "description": "The API for querying alarm clock, help user to check the alarm clock they have set.",
+            "input_parameters": {
+              "token": {
+                "type": "str",
+                "description": "User's token."
+              },
+              "time": {
+                "type": "str",
+                "description": "The time for alarm. Format: %Y-%m-%d %H:%M:%S"
+              }
+            },
+            "output_parameters": {
+              "info": {
+                "type": "json",
+                "description": "alarm info including username, time, content and location"
+              }
+            }
+          },
+          {
+            "name": "QueryBalance",
+            "description": "This API queries the balance of a given user.",
+            "input_parameters": {
+              "token": {
+                "type": "str",
+                "description": "The token of the user."
+              }
+            },
+            "output_parameters": {
+              "balance": {
+                "type": "float",
+                "description": "The balance of the user."
+              }
+            }
+          },
+          {
+            "name": "QueryHealthData",
+            "description": "This API queries the recorded health data in database of a given user and time span.",
+            "input_parameters": {
+              "user_id": {
+                "type": "str",
+                "description": "The user id of the given user. Cases are ignored."
+              },
+              "start_time": {
+                "type": "str",
+                "description": "The start time of the time span. Format: %Y-%m-%d %H:%M:%S"
+              },
+              "end_time": {
+                "type": "str",
+                "description": "The end time of the time span. Format: %Y-%m-%d %H:%M:%S"
+              }
+            },
+            "output_parameters": {
+              "health_data": {
+                "type": "list",
+                "description": "The health data of the given user and time span."
+              }
+            }
+          },
+          {
+            "name": "QueryHistoryToday",
+            "description": "This API queries the history of the given date.",
+            "input_parameters": {
+              "date": {
+                "type": "str",
+                "description": "The date of the history. Format: %m-%d"
+              }
+            },
+            "output_parameters": {
+              "history": {
+                "type": "list",
+                "description": "The history of the user today."
+              }
+            }
+          },
+          {
+            "name": "QueryMeeting",
+            "description": "This API allows users to query the information of a meeting.",
+            "input_parameters": {
+              "token": {
+                "type": "str",
+                "description": "User's token."
+              },
+              "meeting_topic": {
+                "type": "str",
+                "description": "The title of the meeting, no more than 50 characters."
+              },
+              "start_time": {
+                "type": "str",
+                "description": "The start time of the meeting, in the pattern of %Y-%m-%d %H:%M:%S"
+              },
+              "end_time": {
+                "type": "str",
+                "description": "The end time of the meeting, in the pattern of %Y-%m-%d %H:%M:%S"
+              },
+              "location": {
+                "type": "str",
+                "description": "The location where the meeting to be held, no more than 100 characters."
+              },
+              "attendees": {
+                "type": "list(str)",
+                "description": "The attendees of the meeting, including names, positions and other information."
+              }
+            },
+            "output_parameters": {
+              "meeting_info": {
+                "type": "json",
+                "description": "meeting info"
+              }
+            }
+          },
+          {
+            "name": "QueryRegistration",
+            "description": "This API queries the registration of a patient, given patient ID.",
+            "input_parameters": {
+              "patient_name": {
+                "type": "str",
+                "description": "The name of patient."
+              },
+              "date": {
+                "type": "str",
+                "description": "The date of appointment. Format be like %Y-%m-%d"
+              }
+            },
+            "output_parameters": {
+              "appointments": {
+                "type": "list",
+                "description": "The dict where from appointment_id to a list like [\"patient_name\":xxx, \"date\":xxx, \"doctor_name\":xxx]"
+              }
+            }
+          },
+          {
+            "name": "QueryReminder",
+            "description": "The API for querying a reminder item includes content and time.",
+            "input_parameters": {
+              "token": {
+                "type": "str",
+                "description": "User's token."
+              },
+              "content": {
+                "type": "str",
+                "description": "The content of the reminder."
+              },
+              "time": {
+                "type": "str",
+                "description": "The time for the reminder. Format: %Y-%m-%d %H:%M:%S"
+              }
+            },
+            "output_parameters": {
+              "reminder_info": {
+                "type": "json",
+                "description": "remind info"
+              }
+            }
+          },
+          {
+            "name": "QueryScene",
+            "description": "This API queries a scene of smart home system, given the scene name",
+            "input_parameters": {
+              "name": {
+                "type": "str",
+                "description": "The name of the scene."
+              }
+            },
+            "output_parameters": {
+              "devices": {
+                "type": "list",
+                "description": "The list of smart devices, containing the name and description."
+              }
+            }
+          },
+          {
+            "name": "QueryStock",
+            "description": "This API queries the stock price of a given stock code and date.",
+            "input_parameters": {
+              "stock_code": {
+                "type": "str",
+                "description": "The stock code of the given stock."
+              },
+              "date": {
+                "type": "str",
+                "description": "The date of the stock price. Format: %Y-%m-%d"
+              }
+            },
+            "output_parameters": {
+              "stock_price": {
+                "type": "float",
+                "description": "The stock price of the given stock."
+              }
+            }
+          },
+          {
+            "name": "RecordHealthData",
+            "description": "This API records the health data of a user.",
+            "input_parameters": {
+              "user_id": {
+                "type": "str",
+                "description": "The ID of user."
+              },
+              "time": {
+                "type": "str",
+                "description": "The time of health data. Format: %Y-%m-%d %H:%M:%S"
+              },
+              "health_data": {
+                "type": "list",
+                "description": "The health data, with the format like [{'name': 'blood_pressure', 'value': '120/80'}, {'name': 'heart_rate', 'value': '80'}]"
+              }
+            },
+            "output_parameters": {
+              "status": {
+                "type": "str",
+                "description": "The status of recording."
+              }
+            }
+          },
+          {
+            "name": "RegisterUser",
+            "description": "The API for registering a account, given the username, password and email.",
+            "input_parameters": {
+              "username": {
+                "type": "str",
+                "description": "The username of the user."
+              },
+              "password": {
+                "type": "str",
+                "description": "The password of the user."
+              },
+              "email": {
+                "type": "str",
+                "description": "The email of the user."
+              }
+            },
+            "output_parameters": {
+              "token": {
+                "type": "str",
+                "description": "The token of the user."
+              }
+            }
+          },
+          {
+            "name": "SearchEngine",
+            "description": "This API searches for a given keyword for search engine.",
+            "input_parameters": {
+              "keyword": {
+                "type": "str",
+                "description": "The keyword to search."
+              }
+            },
+            "output_parameters": {
+              "results": {
+                "type": "list",
+                "description": "The list of results."
+              }
+            }
+          },
+          {
+            "name": "SendEmail",
+            "description": "This API for sending email, given the receiver, subject and content.",
+            "input_parameters": {
+              "receiver": {
+                "type": "str",
+                "description": "The receiver address of the email."
+              },
+              "subject": {
+                "type": "str",
+                "description": "The subject address of the email."
+              },
+              "content": {
+                "type": "str",
+                "description": "The content of the email."
+              }
+            },
+            "output_parameters": {
+              "status": {
+                "type": "str",
+                "description": "The status of the email."
+              }
+            }
+          },
+          {
+            "name": "SpeechRecognition",
+            "description": "This API recognizes the speech from a given audio url.",
+            "input_parameters": {
+              "url": {
+                "type": "str",
+                "description": "The url to download the audio. It should end with .wav."
+              }
+            },
+            "output_parameters": {
+              "transcript": {
+                "type": "str",
+                "description": "The transcript of the audio."
+              }
+            }
+          },
+          {
+            "name": "SymptomSearch",
+            "description": "This API searches for a given symptom.",
+            "input_parameters": {
+              "symptom": {
+                "type": "str",
+                "description": "The symptom to search."
+              }
+            },
+            "output_parameters": {
+              "results": {
+                "type": "list",
+                "description": "The list of results. Format be like [{\"name\":possible disease name, \"description\": disease details},...]"
+              }
+            }
+          },
+          {
+            "name": "TimedSwitch",
+            "description": "This API for setting a timed switch for a smart device.",
+            "input_parameters": {
+              "name": {
+                "type": "str",
+                "description": "The name of the smart device."
+              },
+              "time": {
+                "type": "str",
+                "description": "The time to switch the device on or off. Format: %Y-%m-%d %H:%M:%S"
+              },
+              "on": {
+                "type": "bool",
+                "description": "Whether to switch the device on or off."
+              }
+            },
+            "output_parameters": {
+              "status": {
+                "type": "str",
+                "description": "Whether the time switch is successful."
+              }
+            }
+          },
+          {
+            "name": "ToolSearcher",
+            "description": "Searches for relevant tools in library based on the keywords.",
+            "input_parameters": {
+              "keywords": {
+                "type": "str",
+                "description": "The keyword to search for."
+              }
+            },
+            "output_parameters": {
+              "best_matchs": {
+                "type": "Union[List[dict], dict]",
+                "description": "The best match tool(s)."
+              }
+            }
+          },
+          {
+            "name": "Translate",
+            "description": "Translate the text to the target language.",
+            "input_parameters": {
+              "src": {
+                "type": "str",
+                "description": "The text to be translated."
+              },
+              "src_lang": {
+                "type": "str",
+                "description": "[Optional] The source language to translate from. Default is auto."
+              },
+              "tgt_lang": {
+                "type": "str",
+                "description": "[Optional] The target language to translate to. Default is english/en."
+              }
+            },
+            "output_parameters": {
+              "translated_text": {
+                "type": "str",
+                "description": "The translated text."
+              }
+            }
+          },
+          {
+            "name": "Wiki",
+            "description": "This API for searching a keyword in Wikipedia.",
+            "input_parameters": {
+              "keyword": {
+                "type": "str",
+                "description": "The keyword to search."
+              }
+            },
+            "output_parameters": {
+              "results": {
+                "type": "dict",
+                "description": "The list of results. Format be like {\"url\": \"xxx\", \"summary\": \"xxx\", \"content\": \"xxx\"}"
+              }
+            }
+          }
+        ],
+        "task": "API-Bank current API tool selection"
+      },
+      "question": {
+        "type": "choice",
+        "instructions": "Select the single API tool to invoke for the dialogue prefix in state. Use the published catalog in state. Do not infer arguments or use the current/future API result.",
+        "criteria": {
+          "option_0": "QueryStock",
+          "option_1": "CancelRegistration",
+          "option_2": "DeleteAccount",
+          "option_3": "GetToday",
+          "option_4": "ModifyAgenda",
+          "option_5": "DeleteScene",
+          "option_6": "GetUserToken",
+          "option_7": "DocumentQA",
+          "option_8": "QueryHistoryToday",
+          "option_9": "ImageCaption",
+          "option_10": "QueryHealthData",
+          "option_11": "CancelTimedSwitch",
+          "option_12": "DeleteMeeting",
+          "option_13": "AddAgenda",
+          "option_14": "RegisterUser",
+          "option_15": "ModifyScene",
+          "option_16": "ModifyAlarm",
+          "option_17": "DeleteAgenda",
+          "option_18": "ForgotPassword",
+          "option_19": "SearchEngine",
+          "option_20": "SendEmail",
+          "option_21": "AddScene",
+          "option_22": "QueryAgenda",
+          "option_23": "ModifyPassword",
+          "option_24": "QueryScene",
+          "option_25": "ToolSearcher",
+          "option_26": "AddAlarm",
+          "option_27": "QueryAlarm",
+          "option_28": "PlayMusic",
+          "option_29": "Dictionary",
+          "option_30": "Calculator",
+          "option_31": "Translate",
+          "option_32": "SymptomSearch",
+          "option_33": "EmergencyKnowledge",
+          "option_34": "ModifyRegistration",
+          "option_35": "BookHotel",
+          "option_36": "TimedSwitch",
+          "option_37": "CheckToken",
+          "option_38": "QueryBalance",
+          "option_39": "ModifyMeeting",
+          "option_40": "ModifyReminder",
+          "option_41": "QueryReminder",
+          "option_42": "DeleteReminder",
+          "option_43": "AppointmentRegistration",
+          "option_44": "AddMeeting",
+          "option_45": "AddReminder",
+          "option_46": "QueryRegistration",
+          "option_47": "Wiki",
+          "option_48": "DeleteAlarm",
+          "option_49": "QueryMeeting",
+          "option_50": "RecordHealthData",
+          "option_51": "OpenBankAccount",
+          "option_52": "SpeechRecognition"
+        }
+      },
+      "components": [
+        {
+          "keys": [
+            "option_0",
+            "option_1",
+            "option_2",
+            "option_3",
+            "option_4",
+            "option_5",
+            "option_6",
+            "option_7",
+            "option_8",
+            "option_9",
+            "option_10",
+            "option_11",
+            "option_12",
+            "option_13",
+            "option_14",
+            "option_15",
+            "option_16",
+            "option_17"
+          ],
+          "logprobs": {
+            "option_0": -4.315251350402832,
+            "option_1": -2.315251111984253,
+            "option_2": -5.190251350402832,
+            "option_3": -3.065251111984253,
+            "option_4": -4.440251350402832,
+            "option_5": -6.065251350402832,
+            "option_6": -5.190251350402832,
+            "option_7": -3.190251111984253,
+            "option_8": -4.315251350402832,
+            "option_9": -5.190251350402832,
+            "option_10": -0.6902511715888977,
+            "option_11": -5.065251350402832,
+            "option_12": -5.940251350402832,
+            "option_13": -4.940251350402832,
+            "option_14": -6.065251350402832,
+            "option_15": -4.940251350402832,
+            "option_16": -5.940251350402832,
+            "option_17": -1.565251111984253
+          },
+          "probabilities": {
+            "option_0": 0.013597241592504408,
+            "option_1": 0.10047080487183188,
+            "option_2": 0.005668173592308006,
+            "option_3": 0.04745904774842238,
+            "option_4": 0.011999523589079571,
+            "option_5": 0.002362846291577901,
+            "option_6": 0.005668173592308006,
+            "option_7": 0.041882462637597165,
+            "option_8": 0.013597241592504408,
+            "option_9": 0.005668173592308006,
+            "option_10": 0.5102328177296696,
+            "option_11": 0.006422882137838052,
+            "option_12": 0.0026774556201361864,
+            "option_13": 0.0072780789587217395,
+            "option_14": 0.002362846291577901,
+            "option_15": 0.0072780789587217395,
+            "option_16": 0.0026774556201361864,
+            "option_17": 0.2126966955827569
+          },
+          "prompt_sha256": "7fff5dfdeb18810475bc77d121ed767d2ebf129aa996bdebcfea3779844b9d1f",
+          "prompt_tokens": 7289,
+          "requests": 1,
+          "missing_from_top": [],
+          "ranks": {},
+          "sampled": "K",
+          "elapsed_ms": 0.0
+        },
+        {
+          "keys": [
+            "option_18",
+            "option_19",
+            "option_20",
+            "option_21",
+            "option_22",
+            "option_23",
+            "option_24",
+            "option_25",
+            "option_26",
+            "option_27",
+            "option_28",
+            "option_29",
+            "option_30",
+            "option_31",
+            "option_32",
+            "option_33",
+            "option_34",
+            "option_35"
+          ],
+          "logprobs": {
+            "option_18": -4.539919376373291,
+            "option_19": -3.414919376373291,
+            "option_20": -4.664919376373291,
+            "option_21": -2.914919376373291,
+            "option_22": -3.539919376373291,
+            "option_23": -6.039919376373291,
+            "option_24": -4.789919376373291,
+            "option_25": -0.9149194955825806,
+            "option_26": -3.539919376373291,
+            "option_27": -5.164919376373291,
+            "option_28": -4.414919376373291,
+            "option_29": -4.664919376373291,
+            "option_30": -5.289919376373291,
+            "option_31": -4.414919376373291,
+            "option_32": -4.539919376373291,
+            "option_33": -3.789919376373291,
+            "option_34": -4.789919376373291,
+            "option_35": -1.1649194955825806
+          },
+          "probabilities": {
+            "option_18": 0.010955200475993743,
+            "option_19": 0.03374439308943076,
+            "option_20": 0.009667930487257762,
+            "option_21": 0.05563509865341091,
+            "option_22": 0.02977932238101967,
+            "option_23": 0.0024444356366666387,
+            "option_24": 0.008531918709408153,
+            "option_25": 0.41109081601374725,
+            "option_26": 0.02977932238101967,
+            "option_27": 0.005863896256492333,
+            "option_28": 0.01241386847240927,
+            "option_29": 0.009667930487257762,
+            "option_30": 0.005174870283431888,
+            "option_31": 0.01241386847240927,
+            "option_32": 0.010955200475993743,
+            "option_33": 0.023192159589673935,
+            "option_34": 0.008531918709408153,
+            "option_35": 0.32015784942496917
+          },
+          "prompt_sha256": "63318c5fee24a9c400ce7fa733d6dfa5bdeb6337748af52f28c38a9cf64dcd47",
+          "prompt_tokens": 7285,
+          "requests": 1,
+          "missing_from_top": [],
+          "ranks": {},
+          "sampled": "H",
+          "elapsed_ms": 0.0
+        },
+        {
+          "keys": [
+            "option_36",
+            "option_37",
+            "option_38",
+            "option_39",
+            "option_40",
+            "option_41",
+            "option_42",
+            "option_43",
+            "option_44",
+            "option_45",
+            "option_46",
+            "option_47",
+            "option_48",
+            "option_49",
+            "option_50",
+            "option_51",
+            "option_52"
+          ],
+          "logprobs": {
+            "option_36": -5.191671848297119,
+            "option_37": -4.816671848297119,
+            "option_38": -6.191671848297119,
+            "option_39": -4.941671848297119,
+            "option_40": -5.816671848297119,
+            "option_41": -6.691671848297119,
+            "option_42": -6.566671848297119,
+            "option_43": -4.441671848297119,
+            "option_44": -6.441671848297119,
+            "option_45": -6.066671848297119,
+            "option_46": -6.316671848297119,
+            "option_47": -6.691671848297119,
+            "option_48": -6.941671848297119,
+            "option_49": -6.066671848297119,
+            "option_50": -0.06667178124189377,
+            "option_51": -6.441671848297119,
+            "option_52": -7.316671848297119
+          },
+          "probabilities": {
+            "option_36": 0.005628823969102504,
+            "option_37": 0.008189890549441291,
+            "option_38": 0.002070728616205849,
+            "option_39": 0.00722755304238879,
+            "option_40": 0.0030128923585837387,
+            "option_41": 0.0012559603936731622,
+            "option_42": 0.001423189577203946,
+            "option_43": 0.011916220436099823,
+            "option_44": 0.001612685067829482,
+            "option_45": 0.0023464429281748675,
+            "option_46": 0.0018274115898949473,
+            "option_47": 0.0012559603936731622,
+            "option_48": 0.0009781429380993287,
+            "option_49": 0.0023464429281748675,
+            "option_50": 0.9466227029891441,
+            "option_51": 0.001612685067829482,
+            "option_52": 0.0006722671544807702
+          },
+          "prompt_sha256": "0a23fdf0a50d1fc39b8a3dbb6fc738c7c910d840a6a85b5a1a1dc1c4caf4797b",
+          "prompt_tokens": 7273,
+          "requests": 1,
+          "missing_from_top": [],
+          "ranks": {},
+          "sampled": "O",
+          "elapsed_ms": 0.0
+        },
+        {
+          "keys": [
+            "option_10",
+            "option_25",
+            "option_50"
+          ],
+          "logprobs": {
+            "option_10": -4.198484897613525,
+            "option_25": -3.5734848976135254,
+            "option_50": -0.07348483800888062
+          },
+          "probabilities": {
+            "option_10": 0.015447341359097142,
+            "option_25": 0.02885943304720881,
+            "option_50": 0.9556932255936942
+          },
+          "prompt_sha256": "110b3cd9ad55d814f7ac6c806efa42efba4b467acaeb0f9b7af56944557df87c",
+          "prompt_tokens": 7094,
+          "requests": 1,
+          "missing_from_top": [],
+          "ranks": {},
+          "sampled": "C",
+          "elapsed_ms": 0.0
+        }
+      ],
+      "expected": "option_50",
+      "scores": {
+        "option_0": 0.0,
+        "option_1": 0.0,
+        "option_2": 0.0,
+        "option_3": 0.0,
+        "option_4": 0.0,
+        "option_5": 0.0,
+        "option_6": 0.0,
+        "option_7": 0.0,
+        "option_8": 0.0,
+        "option_9": 0.0,
+        "option_10": 0.015447341359097142,
+        "option_11": 0.0,
+        "option_12": 0.0,
+        "option_13": 0.0,
+        "option_14": 0.0,
+        "option_15": 0.0,
+        "option_16": 0.0,
+        "option_17": 0.0,
+        "option_18": 0.0,
+        "option_19": 0.0,
+        "option_20": 0.0,
+        "option_21": 0.0,
+        "option_22": 0.0,
+        "option_23": 0.0,
+        "option_24": 0.0,
+        "option_25": 0.02885943304720881,
+        "option_26": 0.0,
+        "option_27": 0.0,
+        "option_28": 0.0,
+        "option_29": 0.0,
+        "option_30": 0.0,
+        "option_31": 0.0,
+        "option_32": 0.0,
+        "option_33": 0.0,
+        "option_34": 0.0,
+        "option_35": 0.0,
+        "option_36": 0.0,
+        "option_37": 0.0,
+        "option_38": 0.0,
+        "option_39": 0.0,
+        "option_40": 0.0,
+        "option_41": 0.0,
+        "option_42": 0.0,
+        "option_43": 0.0,
+        "option_44": 0.0,
+        "option_45": 0.0,
+        "option_46": 0.0,
+        "option_47": 0.0,
+        "option_48": 0.0,
+        "option_49": 0.0,
+        "option_50": 0.9556932255936942,
+        "option_51": 0.0,
+        "option_52": 0.0
+      }
+    }
+  ]
+}

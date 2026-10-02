@@ -9,18 +9,21 @@ client in another language can be written from it.
 
 Measured numbers on this page come from `shisa-ai/shisa-de-1` served by
 `vllm-0.26.0-tp2-c1aff9a1` on 2026-09-25. Those text measurements used
-`de1-letter-slots-v1`. The current readout version is `de1-letter-slots-v2`:
-text rendering and scoring are unchanged; image input adds the chat-completions
-path described in [Image readout](#12-image-readout). Re-measure if the serving
+`de1-letter-slots-v1`. The readout version is `de1-letter-slots-v3`:
+small-choice text and image requests are unchanged from v2; the client adds
+text-choice overflow orchestration described in [Overflow](#13-text-choice-overflow).
+Image input uses the chat-completions path described in
+[Image readout](#12-image-readout). Re-measure if the serving
 fingerprint changes; logprobs move slightly between serving shapes.
 
 Readout identity describes the answer-producing contract, not the client build.
 Implementation-only fixes do not change it. Client releases are identified
 separately by `shisa_de.__version__`.
 
-- Readout version: `de1-letter-slots-v2`
-- Maximum options per question: 26
-- Requests per question: 1, plus 1 per option letter outside the returned top-k
+- Readout version: `de1-letter-slots-v3`
+- Maximum options per prompt: 26; text choices through `DecisionModel`: 676
+- Requests per direct prompt: 1, plus 1 per option letter outside the top-k;
+  overflow choices use multiple prompts (section 13)
 - Answer position: the first generated token
 
 ## The contract in one page
@@ -390,8 +393,10 @@ committed suites, on the local merged bf16 serving shape. On the test split
 from 0.138 to 0.046 for choice. The argmax never changes; only the reported
 probability does.
 
-`calibrated=True` is the default for `classify` and `decide`, and every answer
-records `calibrated` and `temperature`, so a threshold fitted against raw scores
+`calibrated=True` is the default for direct text answers from `classify` and
+`decide`. Overflow answers are uncalibrated and reject explicit
+`calibrated=True`; see section 13. Every answer records `calibrated` and
+`temperature`, so a threshold fitted against raw scores
 is never mixed with tempered ones silently. Pass `calibrated=False` for raw
 logprob-derived probabilities.
 
@@ -404,16 +409,16 @@ scores 0.999351 here). Re-fit before using these numbers to drive a gate.
 
 | Limit | Value | Source |
 | --- | --- | --- |
-| Options per question | 26 (`A` to `Z`) | The readout reads one letter per answer |
+| Options per prompt | 26 (`A` to `Z`); client text choice overflow up to 676 | One letter per prompt option; section 13 |
 | Questions per request | 1 | One answer position per prompt |
 | Prompt tokens, 2 options | 137 | Measured, spam example |
 | Prompt tokens, 26 options | 513 | Measured, spam example |
-| Requests per question | 1, plus 1 per letter outside the top-k | Measured: 7 requests for 26 options |
+| Requests per direct prompt | 1, plus 1 per letter outside the top-k; overflow uses multiple prompts (section 13) | Measured: 7 requests for 26 options |
 | Round trip, one question | 81 to 128 ms, median 100 ms | Measured from a workstation against the hosted endpoint |
 | Completion tokens | 1 | `max_tokens: 1` |
 
-Because one question costs one request, a 20-label multi-label head costs 20
-requests. `DecisionModel` runs questions concurrently over a thread pool
+Because each direct question costs at least one request, a 20-label multi-label
+head costs at least 20 requests. `DecisionModel` runs questions concurrently over a thread pool
 (`max_workers`, default 8) and reports `usage["requests"]` and
 `usage["input_tokens"]` per call.
 
@@ -554,10 +559,87 @@ option distribution.
 
 Each successful image question costs one request. Input usage includes image
 tokens reported by the server. `result.meta["input_type"]` distinguishes
-`"image"` from `"text"`, and `readout_version` is `de1-letter-slots-v2` for both.
+`"image"` from `"text"`, and `readout_version` is `de1-letter-slots-v3` for both.
 Image answers default to `calibrated=False`: the bundled calibration record
 was fitted for the unchanged v1 text path, not images. Explicit
 `calibrated=True` applies the supplied calibration, but does not establish
 that it has been fitted for images. With `debug=True`, image requests expose
 `result.raw[head]["messages"]` instead of a locally rendered prompt; this includes
 the image URL or embedded image bytes.
+
+## 13. Text choice overflow
+
+`DecisionModel(overflow="finalist-top1")` is the default. Text `Choice` and
+single-label `classify` heads with 27–676 options use this two-stage rule:
+
+1. Split options, in caller order, into `ceil(N / 26)` consecutive chunks.
+   Chunk sizes differ by at most one; larger chunks come first. Every chunk
+   has 2–26 options. For example, 53 becomes 18, 18, 17.
+2. Read each chunk using the same state, instructions and rendered descriptions
+   as the original choice. Keep each chunk's argmax; presentation order breaks
+   ties. No calibration is applied before selection.
+3. List the winners in original option order. Ask a fresh choice over those
+   finalists, with unchanged state and instructions. Its argmax is the answer.
+4. Return a full-key map with the final-round softmax on finalists and zero on
+   eliminated options. These are **selection scores conditional on survival**.
+   Zero means elimination, not impossibility; the map is not calibrated global
+   confidence.
+
+`MAX_OPTIONS` and `Question.validate()` remain capped at 26 for an individual
+prompt. Overflow orchestration lives above `Readout.evaluate`, so directly
+rendering a wide question still raises `QuestionError`. The 676-option client
+limit gives at most 26 finalists without recursion. Tests cover that structural
+limit; live quality evidence covers at most 151 options, not all 676.
+
+Pass `overflow="error"` to retain strict rejection. Image choices and ordered
+scores above 26 are rejected, as are choices above 676. All heads are validated
+before requests begin. An overflow request failure raises without returning a
+partial decision; requests already sent still consume endpoint resources.
+There is no automatic retry, truncation or alternate-protocol fallback.
+
+Overflow always returns `calibrated=False`, `temperature=1.0` and
+`confidence=None`. Explicit `calibrated=True` with any overflow head raises
+before requests. Omit it for mixed calls: direct text heads retain their
+ordinary calibration while wide heads remain uncalibrated. Mixed calls set
+`result.meta["calibrated"]` to `None` when head statuses differ;
+`calibration_by_head` gives the individual flags. Mixed calls with all heads
+uncalibrated set it to `False`. The bundled calibration ID in metadata identifies the available record,
+not a fit applied to overflow.
+
+`Answer.strategy` is `"finalist-top1"`, `score_semantics` is
+`"conditional-on-finalists"`, `stages` is 2, and `finalists` lists surviving
+keys. `logical_reads` is the chunk count plus one. `requests` and input tokens
+include all chunk/final reads and letter fallbacks. `result.raw[head]` retains
+component distributions and cost; `debug=True` also includes prompts.
+`Answer.to_dict()` retains the strategy fields. Overflow `to_wire()` answers
+include extension fields `strategy`, `score_semantics` and `calibrated=False`,
+and omit unavailable confidence. Strict TypeSafe consumers must accept those
+extensions or reject overflow; direct-answer serialization is unchanged.
+
+Heads use the existing bounded thread pool; chunks within a head run
+sequentially, without nested pools. `usage["output_tokens"]` counts logical
+reads, as a generated-token estimate; it is not server-reported token billing
+and excludes additional fallback generation. `usage["logical_reads"]` makes
+that count explicit. Transport batching is not implemented.
+
+`DecisionModel(max_logprobs=40)` requests a larger top-k on text reads and can
+reduce fallbacks where the server permits it. The default stays 20, preserving
+the small-choice request shape. An injected `readout` owns its own top-k
+configuration. Image requests use the separate `image_top_logprobs` setting.
+
+### Measured selection evidence
+
+On 2026-10-02, hosted `shisa-ai/shisa-de-1` at fingerprint
+`vllm-0.26.0-tp2-ae644bcc`, with top-k 40: the rule was selected on 100 paired
+development rows, then scored on 500 held-out rows across API-Bank, BANKING77,
+CLINC150+OOS, ChessBench and POP909. Accepted-answer row accuracy was 55.2%
+versus 51.8% for peak-selected chunks, at 5.028 versus 4.028 HTTP requests per
+question. These are sample accuracies, not a full Decision Index rescore.
+
+On 100 separate rows, accuracy was 55% in native order and 56% under a fixed
+permutation, but 26% of chosen answers changed. Preserve caller order; this
+rule is not order-invariant. Existing small-choice calibration does not cover
+it. Source: research repository `research-jev-universal-classifiers`, commit
+`ef18e24`, `evals/reports/DE1-OVERFLOW.md` and its retained artifacts.
+`tests/fixtures/overflow-replay.json` records five component-distribution cases
+from that held-out run; offline tests reproduce their choices and score maps.

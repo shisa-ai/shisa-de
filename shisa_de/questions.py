@@ -51,7 +51,8 @@ class Question:
         if count > MAX_OPTIONS:
             raise QuestionError(
                 f"{self.type} question offers {count} answers; DE-1 reads one letter per "
-                f"answer and supports at most {MAX_OPTIONS}. Split it into two questions."
+                f"answer and supports at most {MAX_OPTIONS} per prompt. "
+                "Use DecisionModel for text choice overflow."
             )
 
 

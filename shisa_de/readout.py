@@ -66,7 +66,7 @@ ANSWER_PREFIX = "<channel|>"
 #: for changes to rendering, request shape, slot handling, or scoring semantics;
 #: existing thresholds must then be revalidated. Implementation-only fixes
 #: (such as initialization locking) must retain this version.
-READOUT_VERSION = "de1-letter-slots-v2"
+READOUT_VERSION = "de1-letter-slots-v3"
 
 
 class ReadoutError(RuntimeError):
