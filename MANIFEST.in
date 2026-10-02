@@ -1,1 +1,3 @@
 include docs/READOUT.md
+recursive-include tests/fixtures *.json
+recursive-include scripts *.py

@@ -155,7 +155,7 @@ Other label-set forms:
 
 ## Wide text label sets
 
-Source-checkout feature (not included in PyPI 0.1.2): `DecisionModel` handles
+Requires `shisa-de>=0.2.0`: `DecisionModel` handles
 27–676 text choice options with balanced chunks and a final choice among each
 chunk's winner. Ordinary choices with up to 26 options keep their direct path.
 

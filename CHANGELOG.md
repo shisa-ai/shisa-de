@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.2.0
 
 - Add `finalist-top1` overflow for 27–676-option text choices: balanced chunks,
   then one final choice among chunk winners. Use `overflow="error"` for strict
