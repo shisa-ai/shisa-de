@@ -1,9 +1,9 @@
 # shisa-de
 
-A Python client for [Shisa DE-1](https://huggingface.co/shisa-ai/shisa-de-1), a
-model for classification and typed decisions. Use it through the hosted
+A Python client for [Shisa DE-1](https://huggingface.co/shisa-ai/shisa-de-1) and
+DE-2, models for classification and typed decisions. Use it through the hosted
 [Shisa Platform](https://platform.shisa.ai/) or a local OpenAI-compatible server
-serving DE-1.
+serving either family.
 
 Give it text, images, or structured data and a set of labels or questions. It returns
 answers, probabilities, and request usage—not generated prose. The client loads
@@ -268,6 +268,27 @@ raw probabilities. Pass `calibrated=False` for raw text probabilities too.
 Each answer records `calibrated` and `temperature`; `result.meta` records the
 readout version and calibration identity. See the [readout documentation](docs/READOUT.md)
 for the scoring and calibration details.
+
+DE-1 and DE-2 share the letter-slot readout but not a calibration, so the client
+picks the record from the served model id: an id carrying a DE-1 slug
+(`shisa-de-1`, `de-1`, `de1-…`) is DE-1, and **anything else is treated as DE-2**.
+That default is a guess about an unlabelled id, and `doctor` reports it as one:
+
+```bash
+shisa-de doctor --model de2-v4-lr5e5-e3-s7 --tokenizer google/gemma-4-26B-A4B-it
+shisa-de doctor --model my-arm --calibration de2      # force a family
+shisa-de doctor --model my-arm --calibration ./my.json # or a record you fitted
+```
+
+`doctor` prints the model the record was fitted on and fails when the record and
+the served model disagree about family or readout version, because applying one
+checkpoint's temperatures to another is silent and wrong rather than loud and
+broken.
+
+One caveat on the bundled DE-2 record: its `choice` temperature is withheld as
+degenerate and ships as `1.0`, so `calibrated=True` is a no-op on DE-2 choice
+questions until the fit is redone. Its `noul` temperature is `1.36`. The record
+itself records why.
 
 ## Development
 

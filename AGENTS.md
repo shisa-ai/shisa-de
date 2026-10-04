@@ -1,14 +1,19 @@
 # shisa-de — Agent Guide
 
-Client library for Shisa DE-1 decision models. This file exists to prevent the
-two mistakes that would make the library quietly wrong: changing the readout
-without bumping its version, and writing a number into a doc that nobody
-measured.
+Client library for Shisa DE-1 and DE-2 decision models. This file exists to prevent the
+three mistakes that would make the library quietly wrong: changing the readout
+without bumping its version, writing a number into a doc that nobody
+measured, and applying one checkpoint's calibration to another.
 
 ## Summary
 
-- `shisa_de` sends typed questions to a served DE-1 and reads the answers back.
-  It never loads weights and never generates prose.
+- `shisa_de` sends typed questions to a served DE-1 or DE-2 and reads the
+  answers back. It never loads weights and never generates prose.
+- DE-1 and DE-2 share the letter-slot readout but not a calibration. The record
+  is chosen from the served model id (`shisa_de/family.py`): an explicit DE-1
+  slug is DE-1, anything else is assumed to be DE-2 and reported as an
+  assumption. A record and a model that disagree on family or readout version
+  fail `doctor`.
 - `docs/READOUT.md` is the contract. The code implements that page; the page
   does not describe the code. If they disagree, the page is right and the code
   is a bug — unless the page itself was wrong, in which case both change
@@ -51,8 +56,10 @@ What must not change casually:
 | `shisa_de/client.py` | `DecisionModel.classify`, `DecisionModel.decide`, `Decision`, `Answer` |
 | `shisa_de/overflow.py` | Balanced chunks, top-one finalists, conditional score maps; text choices only |
 | `shisa_de/questions.py` | `Noul`, `Choice`, `Score` and their wire shapes |
-| `shisa_de/calibration.py` | Temperature scaling and the confidence statistic |
-| `shisa_de/data/calibration.json` | Fitted temperatures with their provenance |
+| `shisa_de/calibration.py` | Temperature scaling, the confidence statistic, and record selection by family |
+| `shisa_de/family.py` | Reads DE-1/DE-2 from a served model id, and says whether that was declared or assumed |
+| `shisa_de/data/calibration.json` | Fitted DE-1 temperatures with their provenance |
+| `shisa_de/data/calibration-de2.json` | Fitted DE-2 temperatures; currently a placeholder, and says so |
 | `shisa_de/cli.py` | `shisa-de doctor`, `ask`, `explain` |
 | `tests/test_offline.py` | Stubbed tokenizer and mock transport; no network |
 | `tests/test_live.py` | Opt-in live checks, including the model card's 161-token example |

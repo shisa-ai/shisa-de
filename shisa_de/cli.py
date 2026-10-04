@@ -12,6 +12,7 @@ import json
 import shlex
 from typing import Any
 
+from .calibration import CALIBRATION_FILES, resolve_calibration
 from .client import DEFAULT_ENDPOINT, DEFAULT_MODEL, DecisionModel, _api_key_from_env
 from .readout import LETTERS, READOUT_VERSION
 from .questions import Choice
@@ -44,6 +45,11 @@ def _common(parser: argparse.ArgumentParser) -> None:
     parser.add_argument("--base-url", default=None, help=f"endpoint (default: {DEFAULT_ENDPOINT})")
     parser.add_argument("--model", default=DEFAULT_MODEL, help="served model id")
     parser.add_argument("--tokenizer", default=None, help="tokenizer source (defaults to --model)")
+    parser.add_argument(
+        "--calibration", default=None, metavar="SPEC",
+        help=("calibration record: a family (" + ", ".join(sorted(CALIBRATION_FILES))
+              + ") or a path to a record. Default: chosen from the served model id"),
+    )
     parser.add_argument("--timeout", type=float, default=120.0)
 
 
@@ -79,6 +85,7 @@ def main(argv: list[str] | None = None) -> int:
     model = DecisionModel(
         base_url=args.base_url, model=args.model, tokenizer=args.tokenizer, timeout=args.timeout,
         image_top_logprobs=getattr(args, "image_top_logprobs", 20),
+        calibration=resolve_calibration(getattr(args, "calibration", None)),
     )
     with model:
         if args.command == "doctor":
@@ -88,13 +95,23 @@ def main(argv: list[str] | None = None) -> int:
             else:
                 print(f"endpoint        {report['base_url']}")
                 print(f"model           {report['model']}")
+                print(f"family          {report['model_family']}"
+                      f"{' (assumed)' if not report.get('family_explicit') else ''}")
                 print(f"readout         {report['readout_version']}")
                 print(f"calibration     {report['calibration']}")
+                print(f"  fitted on     {report.get('calibration_model')} "
+                      f"({report.get('calibration_readout_version')}, "
+                      f"{report.get('calibration_serving_shape')})")
+                print(f"  match         {'yes' if report.get('calibration_match') else 'NO'}")
+                for reason in report.get("calibration_mismatch", []):
+                    print(f"                {reason}")
                 print(f"models endpoint {report.get('models_status')}")
                 if report.get("served_models") is not None:
                     listed = "yes" if report.get("model_listed") else "no"
                     print(f"model listed    {listed} (of {len(report['served_models'])} served ids)")
                 print(f"boundary check  {report.get('boundary_check')}")
+                if report.get("family_note"):
+                    print(f"note            {report['family_note']}")
                 print(f"ok              {report['ok']}")
             return 0 if report["ok"] else 1
 

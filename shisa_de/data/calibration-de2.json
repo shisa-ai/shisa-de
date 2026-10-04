@@ -1,0 +1,21 @@
+{
+  "temperatures": {
+    "noul": 1.36,
+    "choice": 1.0
+  },
+  "readout_version": "de1-letter-slots-v3",
+  "model": "de2-v4-lr5e5-e3-s7",
+  "serving_shape": "transformers-bf16-single-gpu",
+  "fitted_on": "DE-2 calibration partition (de2_partitions_v11), 576 questions: 490 noul, 42 choice, 44 score. NLL grid 0.5-32.0 step 0.01.",
+  "test_ece": {
+    "split": "calibration (in-sample, no held-out half)",
+    "n": 576,
+    "noul_before": 0.0233,
+    "noul_after": 0.0263,
+    "choice_before": 0.0255,
+    "choice_after": 0.0255
+  },
+  "source": "scripts/fit_de2_calibration.py on /tmp/de2-calib-v4-lr5e5-e3-s7/calibration_items.jsonl; report evals/reports/de2-temperature-fit.json",
+  "family": "de2",
+  "note": "PLACEHOLDER. Fitted on the DE-2 calibration partition: 192 Japanese rows drawn from training-adjacent mg-ja suites, on which this checkpoint is at ceiling (noul accuracy 0.965, score 1.000). The partition carries almost no calibration signal, and the fit is in-sample because it has no held-out half. Fitted on the in-process Transformers readout, not through vLLM, so serving_shape is recorded as transformers-bf16-single-gpu. Withheld as degenerate: T_choice optimum pinned to the grid floor 0.5; NLL still falling as T decreases. A withheld temperature ships as 1.0, which leaves the raw distribution untouched rather than applying an arbitrary sharpening. The NLL-optimal temperature makes in-sample ECE worse (noul 0.0233 -> 0.0263), so this fit is not evidence of better calibration. Refit on a larger multi-language partition and on the serving readout before use."
+}

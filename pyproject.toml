@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "shisa-de"
-version = "0.2.0"
+version = "0.3.0"
 description = "Talk to Shisa DE-1 decision models: typed questions in, typed answers out"
 readme = "README.md"
 requires-python = ">=3.10"

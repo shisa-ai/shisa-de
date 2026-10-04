@@ -20,7 +20,15 @@ import httpx
 import pytest
 
 from shisa_de import Choice, DecisionModel, Noul, Readout, ReadoutError, Score, softmax
-from shisa_de.calibration import confidence, temper_binary, temper_distribution
+from shisa_de.calibration import (
+    CALIBRATION_FILES,
+    calibration_for,
+    confidence,
+    load_calibration,
+    temper_binary,
+    temper_distribution,
+)
+from shisa_de.family import family_is_explicit, model_family
 from shisa_de.client import Decision, _MultiLabel, _question_from_head
 from shisa_de.images import ImageError, prepare_image, validate_image_url
 from shisa_de.questions import MAX_OPTIONS, QuestionError, render_option
@@ -977,6 +985,94 @@ def test_calibration_is_applied_by_default_and_can_be_turned_off():
     assert raw.answers["intent"].calibrated is False
 
 
+# -- DE-1 vs DE-2 ------------------------------------------------------------
+
+@pytest.mark.parametrize("model_id,expected,explicit", [
+    ("shisa-ai/shisa-de-1", "de1", True),
+    ("de-1", "de1", True),
+    ("de1-cont-v1-lr2e5-s7", "de1", True),
+    ("shisa-ai/shisa-de-2", "de2", True),
+    ("de2-v4-lr5e5-e3-s7", "de2", True),
+    # No slug: DE-2 is assumed, and reported as an assumption.
+    ("gemma-4-26b-a4b-it", "de2", False),
+    ("w2-lr1e-4-s13", "de2", False),
+    # A slug has to be its own token, so these are not read as DE-1.
+    ("de-13", "de2", False),
+    ("de1x", "de2", False),
+])
+def test_model_family_defaults_to_de2_without_a_de1_slug(model_id, expected, explicit):
+    assert model_family(model_id) == expected
+    assert family_is_explicit(model_id) is explicit
+
+
+def test_the_default_calibration_follows_the_served_model_id():
+    de1 = DecisionModel(model="shisa-ai/shisa-de-1")
+    de2 = DecisionModel(model="de2-v4-lr5e5-e3-s7")
+    assert de1.calibration.family == "de1"
+    assert de2.calibration.family == "de2"
+    # Two records, not one under two names: reading DE-2 must not apply DE-1's fit.
+    assert de1.calibration.temperatures != de2.calibration.temperatures
+    assert de1.calibration.model != de2.calibration.model
+
+
+def test_an_explicit_calibration_overrides_the_model_id():
+    model = DecisionModel(model="de2-v4-lr5e5-e3-s7", calibration=calibration_for("de1"))
+    assert model.calibration.family == "de1"
+
+
+def test_every_shipped_record_loads_and_names_the_model_it_was_fitted_on():
+    for family, name in CALIBRATION_FILES.items():
+        record = load_calibration(name)
+        assert record.family == family, name
+        # The identity has to carry the fitted model, or a reader of one answer
+        # cannot tell which checkpoint the number beside it came from.
+        assert record.model and record.model in record.id
+        assert record.readout_version in record.id
+
+
+def test_a_record_reports_each_field_that_disagrees():
+    record = calibration_for("de1")
+    ok, reasons = record.matches("shisa-ai/shisa-de-1", record.readout_version)
+    assert ok and reasons == []
+
+    ok, reasons = record.matches("de2-v4-lr5e5-e3-s7", record.readout_version)
+    assert not ok and any("family" in reason for reason in reasons)
+
+    ok, reasons = record.matches("shisa-ai/shisa-de-1", "some-other-readout")
+    assert not ok and any("readout" in reason for reason in reasons)
+
+
+def test_health_fails_when_the_calibration_does_not_match_the_model():
+    """The mismatch that used to pass silently now fails the report."""
+    def handler(request):
+        return httpx.Response(200, json={"data": [{"id": "de2-v4-lr5e5-e3-s7"}]})
+
+    with DecisionModel(base_url="http://test.local", model="de2-v4-lr5e5-e3-s7",
+                       calibration=calibration_for("de1"),
+                       transport=httpx.MockTransport(handler)) as model:
+        model.readout._tokenizer = StubTokenizer()
+        report = model.health()
+    assert report["boundary_check"] == "passed"
+    assert report["model_listed"] is True
+    assert report["calibration_match"] is False
+    assert report["calibration_mismatch"]
+    assert report["ok"] is False
+
+
+def test_health_passes_when_the_calibration_matches_the_model():
+    def handler(request):
+        return httpx.Response(200, json={"data": [{"id": "de2-v4-lr5e5-e3-s7"}]})
+
+    with DecisionModel(base_url="http://test.local", model="de2-v4-lr5e5-e3-s7",
+                       transport=httpx.MockTransport(handler)) as model:
+        model.readout._tokenizer = StubTokenizer()
+        report = model.health()
+    assert report["model_family"] == "de2"
+    assert report["family_explicit"] is True
+    assert report["calibration_match"] is True
+    assert report["ok"] is True
+
+
 # -- the client on an image --------------------------------------------------
 
 def make_image_model(handler, **kwargs) -> DecisionModel:
@@ -1068,7 +1164,11 @@ def test_image_multi_label_asks_one_question_per_label():
 
 
 def test_images_default_to_raw_probabilities_and_can_opt_into_calibration():
-    with make_image_model(dual_handler()) as model:
+    # The record is pinned explicitly: this test is about the image path opting
+    # into the same scaling the text path applies, which only holds for a record
+    # whose temperature is not 1.0. The fixture model id carries no family slug,
+    # so it resolves to DE-2, whose placeholder record ships T_choice=1.0.
+    with make_image_model(dual_handler(), calibration=calibration_for("de1")) as model:
         image_default = model.classify({"note": "x"}, {"color": ["red", "blue"]},
                                        image=IMAGE_URL, include_probabilities=True)
         image_tempered = model.classify({"note": "x"}, {"color": ["red", "blue"]},

@@ -23,7 +23,14 @@ from typing import Any, Mapping, Sequence
 
 import httpx
 
-from .calibration import Calibration, confidence as wire_confidence, load_calibration, temper_binary, temper_distribution
+from .calibration import (
+    Calibration,
+    calibration_for,
+    confidence as wire_confidence,
+    temper_binary,
+    temper_distribution,
+)
+from .family import family_is_explicit, model_family
 from .images import prepare_image
 from .questions import MAX_OPTIONS, Choice, Noul, Question, QuestionError, Score
 from .overflow import OVERFLOW_STRATEGY, OverflowRead, read_overflow, validate_overflow
@@ -275,7 +282,13 @@ class DecisionModel:
         if self.base_url.endswith("/v1"):
             self.base_url = self.base_url[:-3]
         self.model = model or DEFAULT_MODEL
-        self.calibration = calibration if calibration is not None else load_calibration()
+        # The calibration has to match the checkpoint, so it is chosen from the
+        # served id rather than shipped as a single global record. An id with no
+        # DE-1 slug is read as DE-2; `family_is_explicit` records whether that
+        # was a declared family or an assumption.
+        self.family = model_family(self.model)
+        self.family_explicit = family_is_explicit(self.model)
+        self.calibration = calibration if calibration is not None else calibration_for(self.family)
         self.max_workers = max(1, int(max_workers))
         if overflow not in (OVERFLOW_STRATEGY, "error"):
             raise ValueError("overflow must be 'finalist-top1' or 'error'")
@@ -329,14 +342,35 @@ class DecisionModel:
         self.close()
 
     def health(self) -> dict[str, Any]:
-        """Check the endpoint, the served model id, and the answer boundary."""
+        """Check the endpoint, the served model id, the answer boundary, and the calibration.
+
+        A passing boundary check says the answer letters were read from the right
+        position. It says nothing about whether the temperatures applied to them
+        belong to this checkpoint, which is a separate failure and a silent one,
+        so the calibration's provenance is checked here too and a mismatch fails
+        the report.
+        """
         report: dict[str, Any] = {
             "base_url": self.base_url,
             "model": self.model,
+            "model_family": self.family,
+            "family_explicit": self.family_explicit,
             "readout_version": READOUT_VERSION,
             "calibration": self.calibration.id,
+            "calibration_model": self.calibration.model,
+            "calibration_readout_version": self.calibration.readout_version,
+            "calibration_serving_shape": self.calibration.serving_shape,
             "ok": False,
         }
+        if not self.family_explicit:
+            report["family_note"] = (
+                f"{self.model!r} carries no DE-1 or DE-2 slug; {self.family!r} was assumed, "
+                "not detected"
+            )
+        matched, reasons = self.calibration.matches(self.model, READOUT_VERSION)
+        report["calibration_match"] = matched
+        if not matched:
+            report["calibration_mismatch"] = reasons
         try:
             ids = self.readout.list_models()
             report["models_status"] = 200
@@ -350,7 +384,7 @@ class DecisionModel:
             self.readout.check_boundary(prompt, slots)
             report["boundary_check"] = "passed"
             report["slots"] = {slot.letter: slot.token_id for slot in slots}
-            report["ok"] = report.get("model_listed", False)
+            report["ok"] = bool(report.get("model_listed", False)) and matched
         except (ReadoutError, QuestionError) as exc:
             report["boundary_check"] = f"failed: {exc}"
         return report
