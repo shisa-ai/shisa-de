@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.2.1
+
+- Add `probability=True` to `decide`, `system_one`, and `classify` to require a
+  single logical read per question and reject choice overflow before requests.
+- Record probability intent in decision metadata. Calibration, direct request
+  bodies, return shapes, and the readout version are unchanged. Missing-letter
+  recovery remains supported.
+
 ## 0.2.0
 
 - Add `finalist-top1` overflow for 27–676-option text choices: balanced chunks,

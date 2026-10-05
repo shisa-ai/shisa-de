@@ -66,6 +66,46 @@ shisa-de ask --state 'WINNER! Claim your free prize now!' --labels spam,ham
 `doctor` checks model-list access, the model ID, and the tokenizer's answer
 boundary. `ask` makes an actual decision request.
 
+## Probability-scored questions
+
+Pass `probability=True` when the distribution, rather than just the winning
+label, is the result you need:
+
+```python
+from shisa_de import DecisionModel, Noul
+
+with DecisionModel() as de:
+    result = de.decide(
+        {"forecast": "Rain is expected tomorrow afternoon."},
+        {"rain": Noul("Will it rain tomorrow?")},
+        probability=True,
+        calibrated=False,
+    )
+    p_yes = result["rain"]
+    distribution = result.answers["rain"].probabilities
+```
+
+The flag applies to every question in the call, including each label in a
+multi-label head. It requires one logical read per question and rejects choices
+above 26 options before any requests are sent: overflow's finalist scores are
+not a distribution over all original options. Missing-letter recovery can still
+require extra HTTP requests at the same answer position.
+
+`decide`, its `system_one` alias, and `classify` accept this flag, defaulting to
+`False`. Direct questions already use a single read with thinking disabled;
+this SDK has no read-twice or thinking policy. The flag records caller intent in
+`result.meta["probability"]` and enforces the single-read restriction. It is not
+sent as a server parameter and does not change prompts or answer shapes.
+`include_probabilities=True` only changes the `classify` dict view; it does not
+set probability intent.
+
+Calibration remains independent. The example requests raw logprob-derived
+probabilities with `calibrated=False`; omitting it retains the default text
+calibration. The flag neither applies a forecasting-specific scale nor selects
+a label-smoothed checkpoint. The bundled temperatures are not a validated fit
+for a different adapter; validate calibration for your serving model and task.
+Image calls also accept the flag and retain their uncalibrated default.
+
 ## Use a local server
 
 First start an OpenAI-compatible server with DE-1 loaded. See the

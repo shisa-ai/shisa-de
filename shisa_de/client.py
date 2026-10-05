@@ -364,6 +364,7 @@ class DecisionModel:
         *,
         include_confidence: bool = False,
         include_probabilities: bool = False,
+        probability: bool = False,
         image: str | Path | None = None,
         calibrated: bool | None = None,
         debug: bool = False,
@@ -380,6 +381,11 @@ class DecisionModel:
         Wide text choices use uncalibrated finalist scores; explicit
         ``calibrated=True`` is rejected for those heads.
 
+        ``probability=True`` requires one logical read per question (per label
+        for multi-label heads) and rejects choice overflow. It does not change
+        calibration or the return shape; ``include_probabilities`` controls
+        the dict view only.
+
         Returns a `Decision`: ``result["intent"]`` is the chosen label, and
         ``result.answers["intent"]`` carries the distribution behind it.
         """
@@ -389,7 +395,7 @@ class DecisionModel:
             question, options = _question_from_head(head, spec)
             questions[head] = question
             parsed[head] = options
-        decision = self._run(state, questions, image=image, calibrated=calibrated, debug=debug)
+        decision = self._run(state, questions, image=image, calibrated=calibrated, probability=probability, debug=debug)
         for head, question in questions.items():
             if isinstance(question, _MultiLabel):
                 threshold = parsed[head]["cls_threshold"]
@@ -428,6 +434,7 @@ class DecisionModel:
         state: Any,
         questions: Mapping[str, Any],
         *,
+        probability: bool = False,
         image: str | Path | None = None,
         calibrated: bool | None = None,
         debug: bool = False,
@@ -441,9 +448,12 @@ class DecisionModel:
         Calibration defaults to enabled for direct text and disabled for images.
         Wide text choices return uncalibrated finalist scores and reject
         explicit ``calibrated=True``.
+        ``probability=True`` requires one logical read per question and rejects
+        choice overflow. It leaves calibration and the return shape unchanged.
+        Letter-recovery requests are still allowed for the same answer position.
         """
         parsed = {head: _question_from_head(head, spec)[0] for head, spec in questions.items()}
-        decision = self._run(state, parsed, image=image, calibrated=calibrated, debug=debug)
+        decision = self._run(state, parsed, image=image, calibrated=calibrated, probability=probability, debug=debug)
         for head, answer in decision.answers.items():
             decision[head] = answer.value
         return decision
@@ -459,8 +469,11 @@ class DecisionModel:
         *,
         image: str | Path | None,
         calibrated: bool | None,
+        probability: bool,
         debug: bool,
     ) -> Decision:
+        if not isinstance(probability, bool):
+            raise ValueError("probability must be a boolean")
         started = time.perf_counter()
         image_url = prepare_image(image) if image is not None else None
         requested_calibration = calibrated
@@ -479,6 +492,11 @@ class DecisionModel:
         overflow_heads = set()
         for head, question in work:
             if isinstance(question, Choice) and len(question.options()) > MAX_OPTIONS:
+                if probability:
+                    raise QuestionError(
+                        f"head {head!r}: probability=True requires a single read; "
+                        f"reduce the choice to at most {MAX_OPTIONS} options"
+                    )
                 if self.overflow == "error":
                     raise QuestionError(f"head {head!r}: overflow='error' rejects choices above {MAX_OPTIONS} options")
                 if image_url is not None:
@@ -557,6 +575,7 @@ class DecisionModel:
             "model": self.model,
             "base_url": self.base_url,
             "readout_version": READOUT_VERSION,
+            "probability": probability,
             "input_type": "image" if image_url is not None else "text",
             "calibration": self.calibration.id,
             "calibrated": ((next(iter({a.calibrated for a in decision.answers.values()}))
