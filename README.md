@@ -68,6 +68,52 @@ shisa-de ask --state 'WINNER! Claim your free prize now!' --labels spam,ham
 boundary, and whether the calibration record belongs to the served model.
 `doctor --probe` also sends one question. `ask` makes an actual decision request.
 
+## Probability-scored questions
+
+Pass `probability=True` when the distribution, rather than just the winning
+label, is the result you need:
+
+```python
+from shisa_de import DecisionModel, Noul
+
+with DecisionModel() as de:
+    result = de.decide(
+        {"forecast": "Rain is expected tomorrow afternoon."},
+        {"rain": Noul("Will it rain tomorrow?")},
+        probability=True,
+        calibrated=False,
+    )
+    p_yes = result["rain"]
+    distribution = result.answers["rain"].probabilities
+```
+
+The flag applies to every question in the call, including each label in a
+multi-label head. It requires one logical read per question. Missing-letter
+recovery can still require extra HTTP requests at the same answer position.
+
+- **DE-1** rejects choices above 26 options before any requests are sent:
+  overflow's finalist scores are not a distribution over all original options.
+  Direct questions already use a single read with thinking disabled.
+- **DE-2** skips the thinking read, so every answer is the repeated read's own
+  distribution (`strategy` is `repeat2`, and `result.meta["policy"]` reads
+  `repeat`). Choices up to 256 options are accepted, because one read returns a
+  distribution over all of them.
+
+`decide`, its `system_one` alias, and `classify` accept this flag, defaulting to
+`False`. The flag records caller intent in `result.meta["probability"]` and
+enforces the single-read restriction. It is not sent as a server parameter and
+does not change prompts or answer shapes.
+`include_probabilities=True` only changes the `classify` dict view; it does not
+set probability intent.
+
+Calibration remains independent. The example requests raw logprob-derived
+probabilities with `calibrated=False`; omitting it retains the default text
+calibration. The flag neither applies a forecasting-specific scale nor selects
+a label-smoothed checkpoint. The bundled temperatures are not a validated fit
+for a different adapter, and the client applies them only to the checkpoint they
+were fitted on; validate calibration for your serving model and task.
+Image calls also accept the flag and retain their uncalibrated default.
+
 ## Use a local server
 
 First start an OpenAI-compatible server with DE-1 or DE-2 loaded. See the

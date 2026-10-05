@@ -219,6 +219,11 @@ A question thinks when both hold, on the raw distribution of the repeated read:
 - its top probability is below the gate, 0.7;
 - it has at most 26 options.
 
+A call made with `probability=True` never thinks: that flag requires one logical
+read per question, so the repeated read's distribution is the answer and
+`result.meta["policy"]` reads `repeat`. Wide choices are still accepted, because
+one read covers every option.
+
 `DecisionModel(think_gate=..., think_budget=...)` change the gate and the
 budget. The option cap is fixed. The research notes report no gain from thinking
 above 26 options or from budgets above 1,024.
@@ -293,7 +298,7 @@ conditional on finalists, because nothing was eliminated.
 | `result.raw[head]["thought"]` | The thought's text, with `debug=True` |
 | `result.usage["thought_tokens"]` | Thought tokens across the call |
 | `result.usage["output_tokens"]` | Logical reads plus thought tokens; an estimate, not server billing |
-| `result.meta` | `family`, `readout_version`, `policy`, `think_gate`, `think_budget`, `think_option_cap` |
+| `result.meta` | `family`, `readout_version`, `policy` (the one that ran), `probability`, `think_gate`, `think_budget`, `think_option_cap` |
 
 ## 6. Images
 

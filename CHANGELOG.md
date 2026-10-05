@@ -43,9 +43,19 @@ DE-2 support. DE-1 answers are unchanged: the DE-1 readout is still
   was requested, and `meta` gains `family` and `policy`. `usage` gains
   `thought_tokens`. The calibration identity is
   `model|readout_version|serving_shape[temperatures]`.
+- `probability=True` (added in 0.2.1) skips the thinking read on DE-2 and
+  accepts its wide choices, which one read covers; DE-1 behaviour is unchanged.
+  `meta["policy"]` records the policy that ran.
 - Add `--family`, `--policy` and `--calibration <family|path>` to the CLI, and
   point the live suite at any served model with `SHISA_DE_MODEL` and
   `SHISA_DE_TOKENIZER`.
+## 0.2.1
+
+- Add `probability=True` to `decide`, `system_one`, and `classify` to require a
+  single logical read per question and reject choice overflow before requests.
+- Record probability intent in decision metadata. Calibration, direct request
+  bodies, return shapes, and the readout version are unchanged. Missing-letter
+  recovery remains supported.
 
 ## 0.2.0
 

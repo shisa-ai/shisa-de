@@ -488,6 +488,7 @@ class DecisionModel:
         *,
         include_confidence: bool = False,
         include_probabilities: bool = False,
+        probability: bool = False,
         image: str | Path | None = None,
         calibrated: bool | None = None,
         debug: bool = False,
@@ -506,6 +507,11 @@ class DecisionModel:
         ``calibrated=True`` is rejected for those heads. DE-2 reads text choices
         up to 256 options in one prompt.
 
+        ``probability=True`` requires one logical read per question (per label
+        for multi-label heads). On DE-1 it rejects choice overflow; on DE-2 it
+        skips the thinking read. It does not change calibration or the return
+        shape; ``include_probabilities`` controls the dict view only.
+
         Returns a `Decision`: ``result["intent"]`` is the chosen label, and
         ``result.answers["intent"]`` carries the distribution behind it.
         """
@@ -515,7 +521,7 @@ class DecisionModel:
             question, options = _question_from_head(head, spec)
             questions[head] = question
             parsed[head] = options
-        decision = self._run(state, questions, image=image, calibrated=calibrated, debug=debug)
+        decision = self._run(state, questions, image=image, calibrated=calibrated, probability=probability, debug=debug)
         for head, question in questions.items():
             if isinstance(question, _MultiLabel):
                 threshold = parsed[head]["cls_threshold"]
@@ -554,6 +560,7 @@ class DecisionModel:
         state: Any,
         questions: Mapping[str, Any],
         *,
+        probability: bool = False,
         image: str | Path | None = None,
         calibrated: bool | None = None,
         debug: bool = False,
@@ -567,9 +574,13 @@ class DecisionModel:
         Calibration defaults to enabled for direct text and disabled for images.
         DE-1 wide text choices return uncalibrated finalist scores and reject
         explicit ``calibrated=True``.
+        ``probability=True`` requires one logical read per question: DE-1
+        rejects choice overflow, and DE-2 skips the thinking read. It leaves
+        calibration and the return shape unchanged. Letter-recovery requests
+        are still allowed for the same answer position.
         """
         parsed = {head: _question_from_head(head, spec)[0] for head, spec in questions.items()}
-        decision = self._run(state, parsed, image=image, calibrated=calibrated, debug=debug)
+        decision = self._run(state, parsed, image=image, calibrated=calibrated, probability=probability, debug=debug)
         for head, answer in decision.answers.items():
             decision[head] = answer.value
         return decision
@@ -585,8 +596,11 @@ class DecisionModel:
         *,
         image: str | Path | None,
         calibrated: bool | None,
+        probability: bool,
         debug: bool,
     ) -> Decision:
+        if not isinstance(probability, bool):
+            raise ValueError("probability must be a boolean")
         started = time.perf_counter()
         image_url = prepare_image(image) if image is not None else None
         requested_calibration = calibrated
@@ -600,6 +614,10 @@ class DecisionModel:
             else:
                 work.append((head, question))
 
+        # A probability call takes one logical read per question, so on DE-2 it
+        # stops at the repeated read: an answer read after a thought is a second.
+        policy = "repeat" if probability and self.policy == "repeat-think" else self.policy
+
         # Validate every head before issuing any requests.
         overflow_heads = set()
         for head, question in work:
@@ -611,6 +629,11 @@ class DecisionModel:
                     raise QuestionError(f"head {head!r}: image choices above {MAX_OPTIONS} options are not supported")
                 question.validate(MAX_CODES if wide else MAX_OPTIONS)
             elif wide:
+                if probability:
+                    raise QuestionError(
+                        f"head {head!r}: probability=True requires a single read; "
+                        f"reduce the choice to at most {MAX_OPTIONS} options"
+                    )
                 if self.overflow == "error":
                     raise QuestionError(f"head {head!r}: overflow='error' rejects choices above {MAX_OPTIONS} options")
                 if image_url is not None:
@@ -632,7 +655,7 @@ class DecisionModel:
                 )
                 options = question.options()
             elif self.family == "de2":
-                read = read_policy(self.readout, state, question, policy=self.policy,
+                read = read_policy(self.readout, state, question, policy=policy,
                                    think_gate=self.think_gate, think_budget=self.think_budget, debug=debug)
                 options = question.options()
             else:
@@ -720,7 +743,8 @@ class DecisionModel:
             "base_url": self.base_url,
             "family": self.family,
             "readout_version": self.readout_version,
-            "policy": self.policy,
+            "policy": policy,
+            "probability": probability,
             "input_type": "image" if image_url is not None else "text",
             "calibration": self.calibration.id,
             "calibrated": next(iter(flags)) if len(flags) == 1 else (None if flags else calibrated),

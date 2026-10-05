@@ -83,6 +83,110 @@ def top_logprobs(entries: dict[str, float], prompt_tokens: int = 12) -> dict:
     }
 
 
+# -- probability intent -------------------------------------------------------
+
+@pytest.mark.parametrize("method", ["decide", "classify", "system_one"])
+@pytest.mark.parametrize("calibrated", [None, False, True])
+def test_probability_preserves_single_read_and_calibration(method, calibrated):
+    calls = []
+
+    def handler(request):
+        calls.append(json.loads(request.content))
+        return httpx.Response(200, json=top_logprobs({"A": -0.5, "B": -1.5}))
+
+    with DecisionModel(readout=make_readout(handler)) as model:
+        ask = getattr(model, method)
+        questions = {"forecast": Noul("Will it rain tomorrow?")}
+        ordinary = ask("state", questions, calibrated=calibrated)
+        result = ask("state", questions, probability=True, calibrated=calibrated)
+    assert calls[0] == calls[1]
+    assert "probability" not in calls[1]  # SDK intent, not a server extension.
+    assert result.answers["forecast"].to_dict() == ordinary.answers["forecast"].to_dict()
+    assert result.to_wire() == ordinary.to_wire()
+    assert ordinary.meta["probability"] is False
+    assert result.meta["probability"] is True
+    assert result.usage["logical_reads"] == result.usage["requests"] == 1
+    raw_yes = softmax({"A": -0.5, "B": -1.5})["A"]
+    expected = (raw_yes if calibrated is False else
+                temper_binary(raw_yes, model.calibration.temperature_for("noul")))
+    assert result["forecast"] == pytest.approx(expected)
+
+
+@pytest.mark.parametrize("method", ["decide", "classify"])
+def test_probability_rejects_overflow_before_any_head_is_sent(method):
+    calls = []
+    with DecisionModel(readout=make_readout(lambda request: calls.append(request))) as model:
+        with pytest.raises(QuestionError, match="probability=True requires a single read"):
+            getattr(model, method)("state", {
+                "small": Noul("Will it rain?"),
+                "wide": list(map(str, range(27))),
+            }, probability=True)
+    assert calls == []
+
+
+@pytest.mark.parametrize("value", [None, 1, "true", "false"])
+def test_probability_requires_boolean(value):
+    calls = []
+    with DecisionModel(readout=make_readout(lambda request: calls.append(request))) as model:
+        with pytest.raises(ValueError, match="probability must be a boolean"):
+            model.decide("state", {"forecast": Noul("Will it rain?")}, probability=value)
+    assert calls == []
+
+
+def test_probability_allows_letter_recovery_not_a_second_logical_read():
+    calls = []
+
+    def handler(request):
+        body = json.loads(request.content)
+        calls.append(body)
+        if "prompt_logprobs" in body:
+            assert body["prompt"] == calls[0]["prompt"] + "B"
+            return httpx.Response(200, json={
+                "choices": [{"prompt_logprobs": [None, {"66": {"logprob": -1.5, "rank": 21}}]}],
+                "usage": {"prompt_tokens": 13},
+            })
+        return httpx.Response(200, json=top_logprobs({"A": -0.5}))
+
+    with DecisionModel(readout=make_readout(handler)) as model:
+        result = model.decide("state", {"forecast": Noul("Will it rain?")},
+                              probability=True, calibrated=False)
+    assert len(calls) == result.usage["requests"] == 2
+    assert result.usage["logical_reads"] == 1
+    assert result.answers["forecast"].missing_from_top == ["B"]
+    assert result["forecast"] == pytest.approx(softmax({"A": -0.5, "B": -1.5})["A"])
+
+
+def test_probability_multilabel_and_display_options_remain_independent():
+    with DecisionModel(readout=make_readout(lambda request: httpx.Response(
+        200, json=top_logprobs({"A": -0.5, "B": -1.5})
+    ))) as model:
+        result = model.classify("state", {
+            "tags": {"labels": ["rain", "wind"], "multi_label": True},
+            "weather": ["wet", "dry"],
+        }, probability=True, include_probabilities=True, calibrated=False)
+    assert result.usage["logical_reads"] == 3
+    assert len(result["tags"]) == 2
+    assert result["weather"]["label"] == "wet"
+    assert sum(result["weather"]["probabilities"].values()) == pytest.approx(1)
+
+
+@pytest.mark.parametrize("method", ["decide", "classify"])
+def test_probability_image_retains_single_read_and_uncalibrated_default(method):
+    calls = []
+
+    def handler(request):
+        calls.append(json.loads(request.content))
+        return httpx.Response(200, json=chat_response({"A": -0.5, "B": -1.5}))
+
+    with DecisionModel(readout=make_image_readout(handler)) as model:
+        result = getattr(model, method)("state", {"forecast": Noul("Will it rain?")},
+                                        probability=True, image=IMAGE_URL)
+    assert len(calls) == result.usage["logical_reads"] == 1
+    assert calls[0]["chat_template_kwargs"] == {"enable_thinking": False}
+    assert result.answers["forecast"].calibrated is False
+    assert result.meta["probability"] is True
+
+
 # -- lazy tokenizer initialization --------------------------------------------
 
 @pytest.mark.parametrize("separate_readouts", [False, True])
@@ -1908,6 +2012,20 @@ def test_de1_still_overflows_where_de2_reads_natively():
     with make_de2_model(server) as de2:
         assert de2.decide("state", {"wide": wide_choice(77)}).answers["wide"].strategy == "repeat2"
     assert len(server.calls) == 1
+
+
+def test_probability_on_de2_stops_at_the_repeated_read_and_accepts_wide_choices():
+    server = StubDE2Server(logprob=lambda code: -1.0, thought=[ord("x"), int(ANSWER_TOKEN_ID)])
+    with make_de2_model(server) as model:
+        unsure = model.decide("state", {"q": wide_choice(3)}, probability=True)
+        wide = model.decide("state", {"q": wide_choice(77)}, probability=True)
+        ordinary = model.decide("state", {"q": wide_choice(3)})
+    # One logical read each: an unsure question would otherwise have thought.
+    assert unsure.answers["q"].strategy == wide.answers["q"].strategy == "repeat2"
+    assert unsure.usage["logical_reads"] == unsure.usage["requests"] == 1
+    assert (unsure.meta["probability"], unsure.meta["policy"]) == (True, "repeat")
+    assert len(wide.answers["q"].probabilities) == 77
+    assert (ordinary.meta["policy"], ordinary.answers["q"].strategy) == ("repeat-think", "repeat2-think")
 
 
 def test_read_policy_rejects_an_unknown_policy():

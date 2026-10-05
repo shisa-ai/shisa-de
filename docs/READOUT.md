@@ -62,6 +62,27 @@ later call can retry. The lock does not cover normal requests or calls using an
 already initialized tokenizer. A slow tokenizer load delays other cold
 initializations, including those for different readout instances.
 
+## Probability intent in the client
+
+`DecisionModel.decide`, `system_one`, and `classify` accept the keyword-only
+boolean `probability=False`. With `probability=True`, every question must use
+one logical read; choices above 26 options are rejected before any head is
+sent. Multi-label heads still expand into one binary question per label.
+Letter recovery in section 6 remains part of the same logical read, even when
+it requires more than one HTTP request.
+
+The flag is client-side intent, recorded in `result.meta["probability"]`, not a
+server request field. Direct reads already disable thinking and do not reread
+answers. It changes neither their prompt nor their scoring, calibration defaults,
+image behavior, or serialization. `include_probabilities` controls only the
+`classify` dict view and does not imply this flag. Callers choose calibration
+separately; probability mode does not establish calibration quality for a new
+checkpoint or forecasting task. The readout version stays `de1-letter-slots-v3`
+because the answer-producing contract is unchanged.
+
+On DE-2 the same flag skips the thinking read and accepts choices up to 256
+options; see [the DE-2 readout](READOUT-DE2.md#4-the-thinking-read).
+
 ## 2. The request
 
 ```http
