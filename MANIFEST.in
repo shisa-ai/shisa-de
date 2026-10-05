@@ -1,3 +1,4 @@
 include docs/READOUT.md
+include docs/READOUT-DE2.md
 recursive-include tests/fixtures *.json
 recursive-include scripts *.py

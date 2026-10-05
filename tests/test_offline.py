@@ -10,6 +10,7 @@ from __future__ import annotations
 import base64
 import json
 import math
+import re
 import sys
 from concurrent.futures import ThreadPoolExecutor
 from contextlib import ExitStack
@@ -25,14 +26,30 @@ from shisa_de.calibration import (
     calibration_for,
     confidence,
     load_calibration,
+    resolve_calibration,
     temper_binary,
     temper_distribution,
 )
-from shisa_de.family import family_is_explicit, model_family
+from shisa_de.family import family_is_explicit, model_family, resolve_family
 from shisa_de.client import Decision, _MultiLabel, _question_from_head
 from shisa_de.images import ImageError, prepare_image, validate_image_url
+from shisa_de.policy import read_policy
 from shisa_de.questions import MAX_OPTIONS, QuestionError, render_option
-from shisa_de.readout import ANSWER_PREFIX, DIRECT_SYSTEM, LetterRead
+from shisa_de.readout import (
+    ANSWER_PREFIX,
+    CALIBRATION_COMPATIBLE,
+    DE2_READOUT_VERSION,
+    DIRECT_SYSTEM,
+    INPUT_REPEAT,
+    MAX_CODES,
+    READOUT_VERSION,
+    READOUT_VERSIONS,
+    THINK_SYSTEM,
+    LetterRead,
+    calibration_compatible,
+    codebook,
+    codes_for,
+)
 
 
 class StubTokenizer:
@@ -216,7 +233,8 @@ def test_endpoint_overrides_preserve_custom_model(monkeypatch, explicit, suffix)
         assert json.loads(request.content)["model"] == "custom-model"
         return httpx.Response(200, json=top_logprobs({"A": -0.1, "B": -3.0}))
 
-    with DecisionModel(model="custom-model", transport=httpx.MockTransport(handler), **kwargs) as model:
+    with DecisionModel(model="custom-model", family="de1",
+                       transport=httpx.MockTransport(handler), **kwargs) as model:
         assert model.base_url == expected
         model.readout._tokenizer = StubTokenizer()
         assert model.classify("state", {"intent": ["a", "b"]})["intent"] == "a"
@@ -256,7 +274,7 @@ def test_health_requires_model_access_and_boundary(monkeypatch, status, listed, 
         assert request.url.path == "/v1/models"
         return httpx.Response(status, json={"data": [{"id": "test-model"}] if listed else []})
 
-    with DecisionModel(base_url="http://test.local", model="test-model",
+    with DecisionModel(base_url="http://test.local", model="test-model", family="de1",
                        transport=httpx.MockTransport(handler)) as model:
         model.readout._tokenizer = StubTokenizer()
         if not boundary_ok:
@@ -985,7 +1003,7 @@ def test_calibration_is_applied_by_default_and_can_be_turned_off():
     assert raw.answers["intent"].calibrated is False
 
 
-# -- DE-1 vs DE-2 ------------------------------------------------------------
+# -- DE-1 vs DE-2: family, readout identity, calibration --------------------
 
 @pytest.mark.parametrize("model_id,expected,explicit", [
     ("shisa-ai/shisa-de-1", "de1", True),
@@ -999,28 +1017,63 @@ def test_calibration_is_applied_by_default_and_can_be_turned_off():
     # A slug has to be its own token, so these are not read as DE-1.
     ("de-13", "de2", False),
     ("de1x", "de2", False),
+    # An id that names both families names neither.
+    ("de-2-vs-de-1-ablation", "de2", False),
 ])
 def test_model_family_defaults_to_de2_without_a_de1_slug(model_id, expected, explicit):
     assert model_family(model_id) == expected
     assert family_is_explicit(model_id) is explicit
 
 
-def test_the_default_calibration_follows_the_served_model_id():
+@pytest.mark.parametrize("model_id,tokenizer,declared,expected", [
+    ("shisa-ai/shisa-de-1", None, None, ("de1", "model id")),
+    ("local-alias", "shisa-ai/shisa-de-1", None, ("de1", "tokenizer")),
+    ("local-alias", "google/gemma-4-26B-A4B-it", None, ("de2", "assumed")),
+    ("local-alias", "google/gemma-4-26B-A4B-it", "DE-1", ("de1", "declared")),
+    ("shisa-ai/shisa-de-1", None, "de2", ("de2", "declared")),
+])
+def test_the_family_is_declared_then_read_from_the_id_then_the_tokenizer(model_id, tokenizer, declared, expected):
+    assert resolve_family(model_id, tokenizer, declared) == expected
+
+
+def test_an_assumed_family_warns_and_a_declared_one_does_not(recwarn):
+    with pytest.warns(UserWarning, match="names neither DE-1 nor DE-2"):
+        assumed = DecisionModel(model="my-arm")
+    assert (assumed.family, assumed.family_source, assumed.family_explicit) == ("de2", "assumed", False)
+    recwarn.clear()
+    declared = DecisionModel(model="my-arm", family="de2")
+    assert (declared.family, declared.family_source) == ("de2", "declared")
+    assert not recwarn.list
+    with pytest.raises(ValueError, match="unknown family"):
+        DecisionModel(model="my-arm", family="de3")
+
+
+def test_each_family_has_one_readout_version_and_its_own_policy():
+    assert READOUT_VERSIONS == {"de1": READOUT_VERSION, "de2": DE2_READOUT_VERSION}
+    assert READOUT_VERSION != DE2_READOUT_VERSION
     de1 = DecisionModel(model="shisa-ai/shisa-de-1")
     de2 = DecisionModel(model="de2-v4-lr5e5-e3-s7")
-    assert de1.calibration.family == "de1"
-    assert de2.calibration.family == "de2"
-    # Two records, not one under two names: reading DE-2 must not apply DE-1's fit.
-    assert de1.calibration.temperatures != de2.calibration.temperatures
-    assert de1.calibration.model != de2.calibration.model
+    assert (de1.readout_version, de1.policy) == (READOUT_VERSION, "direct")
+    assert (de2.readout_version, de2.policy) == (DE2_READOUT_VERSION, "repeat-think")
+    assert DecisionModel(model="de2-x", policy="repeat").policy == "repeat"
+    # DE-1 was measured on one read; the DE-2 policies are not defined for it.
+    with pytest.raises(ValueError, match="not defined for de1"):
+        DecisionModel(model="shisa-ai/shisa-de-1", policy="repeat-think")
 
 
-def test_an_explicit_calibration_overrides_the_model_id():
-    model = DecisionModel(model="de2-v4-lr5e5-e3-s7", calibration=calibration_for("de1"))
-    assert model.calibration.family == "de1"
+def test_a_fit_against_an_answer_identical_readout_still_applies():
+    """The DE-1 record was fitted against v1. v2 and v3 added paths, not changes to that read."""
+    assert calibration_for("de1").readout_version == "de1-letter-slots-v1"
+    assert calibration_compatible("de1-letter-slots-v1", READOUT_VERSION)
+    assert calibration_compatible(READOUT_VERSION, READOUT_VERSION)
+    # Nothing fitted on a DE-1 readout describes the DE-2 one, in either direction.
+    assert not calibration_compatible(READOUT_VERSION, DE2_READOUT_VERSION)
+    assert not calibration_compatible(DE2_READOUT_VERSION, READOUT_VERSION)
+    assert not calibration_compatible("some-other-readout", READOUT_VERSION)
+    assert set(CALIBRATION_COMPATIBLE) == set(READOUT_VERSIONS.values())
 
 
-def test_every_shipped_record_loads_and_names_the_model_it_was_fitted_on():
+def test_every_shipped_record_loads_and_applies_to_its_own_family():
     for family, name in CALIBRATION_FILES.items():
         record = load_calibration(name)
         assert record.family == family, name
@@ -1028,55 +1081,149 @@ def test_every_shipped_record_loads_and_names_the_model_it_was_fitted_on():
         # cannot tell which checkpoint the number beside it came from.
         assert record.model and record.model in record.id
         assert record.readout_version in record.id
+        level, reasons = record.applicability(record.model, READOUT_VERSIONS[family], family=family)
+        assert level in {"checkpoint", "unfitted"} and reasons == [], name
 
 
-def test_a_record_reports_each_field_that_disagrees():
+def test_the_de2_record_is_unfitted_and_keeps_the_withheld_fit_as_provenance():
+    record = calibration_for("de2")
+    assert record.fitted is False
+    assert record.temperatures == {"noul": 1.0, "choice": 1.0}
+    assert record.readout_version == DE2_READOUT_VERSION
+    assert record.withheld["noul"]["nll_optimum"] == 1.36
+    assert calibration_for("de1").fitted is True
+
+
+def test_a_record_applies_to_its_checkpoint_and_says_why_otherwise():
     record = calibration_for("de1")
-    ok, reasons = record.matches("shisa-ai/shisa-de-1", record.readout_version)
-    assert ok and reasons == []
+    assert record.applicability("shisa-ai/shisa-de-1", READOUT_VERSION) == ("checkpoint", [])
+    # A server that aliases the model id is recognised by its tokenizer source.
+    assert record.applicability("alias", READOUT_VERSION, family="de1",
+                                tokenizer="shisa-ai/shisa-de-1") == ("checkpoint", [])
 
-    ok, reasons = record.matches("de2-v4-lr5e5-e3-s7", record.readout_version)
-    assert not ok and any("family" in reason for reason in reasons)
+    level, reasons = record.applicability("de1-cont-v1-lr2e5-s7", READOUT_VERSION)
+    assert level == "family" and "another checkpoint" in reasons[0]
+
+    level, reasons = record.applicability("de2-v4-lr5e5-e3-s7", DE2_READOUT_VERSION)
+    assert level == "mismatch"
+    assert any("family" in reason for reason in reasons) and any("readout" in reason for reason in reasons)
 
     ok, reasons = record.matches("shisa-ai/shisa-de-1", "some-other-readout")
     assert not ok and any("readout" in reason for reason in reasons)
+    assert record.matches("de1-cont-v1-lr2e5-s7", READOUT_VERSION) == (True, [])
+    # Nothing fitted, so nothing to mismatch on: any DE-2 checkpoint may carry it.
+    assert calibration_for("de2").applicability("any-arm", DE2_READOUT_VERSION, family="de2") == ("unfitted", [])
+
+
+def test_the_bundled_record_is_applied_only_to_the_checkpoint_it_was_fitted_on():
+    hosted = DecisionModel(readout=FakeReadout())
+    assert hosted.calibration_applied is True
+    answer = hosted.decide("s", {"n": Noul("q?")}).answers["n"]
+    assert answer.calibrated is True and answer.temperature == 1.69
+
+    with pytest.warns(UserWarning, match="is not applied"):
+        other = DecisionModel(model="de1-cont-v1-lr2e5-s7", readout=FakeReadout())
+    assert (other.calibration_level, other.calibration_applied) == ("family", False)
+    result = other.decide("s", {"n": Noul("q?")})
+    assert result.answers["n"].calibrated is False and result.answers["n"].noul == pytest.approx(0.9)
+    # The metadata says what the answers carry, not what was asked for.
+    assert result.meta["calibrated"] is False
+
+    # Passing the record is the caller vouching for it.
+    vouched = DecisionModel(model="de1-cont-v1-lr2e5-s7", readout=FakeReadout(),
+                            calibration=calibration_for("de1"))
+    assert vouched.calibration_applied is True
+    assert vouched.decide("s", {"n": Noul("q?")}).answers["n"].calibrated is True
+
+
+def test_an_aliased_de1_server_keeps_its_calibration_through_the_tokenizer(recwarn):
+    model = DecisionModel(model="local-alias", tokenizer="shisa-ai/shisa-de-1")
+    assert (model.family, model.family_source) == ("de1", "tokenizer")
+    assert (model.calibration_level, model.calibration_applied) == ("checkpoint", True)
+    assert not recwarn.list
+
+
+@pytest.mark.parametrize("spec,family", [("de1", "de1"), ("DE-1", "de1"), ("de2", "de2"), ("DE2", "de2")])
+def test_a_calibration_spec_accepts_common_family_spellings(spec, family):
+    assert resolve_calibration(spec).family == family
+
+
+def test_a_calibration_spec_that_is_neither_a_family_nor_a_file_is_an_error(capsys):
+    from shisa_de import cli
+
+    assert resolve_calibration(None) is None and resolve_calibration("auto") is None
+    with pytest.raises(ValueError, match="neither a family"):
+        resolve_calibration("de-9")
+    with pytest.raises(SystemExit):
+        cli.main(["doctor", "--calibration", "no/such/record.json"])
+    assert "neither a family" in capsys.readouterr().err
+
+
+def test_health_passes_for_the_default_de1_model():
+    """The shipped DE-1 record was fitted against v1 and has to pass under v3."""
+    def handler(request):
+        return httpx.Response(200, json={"data": [{"id": "shisa-ai/shisa-de-1"}]})
+
+    with DecisionModel(base_url="http://test.local", transport=httpx.MockTransport(handler)) as model:
+        model.readout._tokenizer = StubTokenizer()
+        report = model.health()
+    assert report["readout_version"] == READOUT_VERSION
+    assert report["calibration_readout_version"] == "de1-letter-slots-v1"
+    assert (report["calibration_level"], report["calibration_applied"]) == ("checkpoint", True)
+    assert report["calibration_match"] is True and report["ok"] is True
 
 
 def test_health_fails_when_the_calibration_does_not_match_the_model():
-    """The mismatch that used to pass silently now fails the report."""
+    """A DE-1 record forced onto a DE-2 endpoint fails the report."""
     def handler(request):
         return httpx.Response(200, json={"data": [{"id": "de2-v4-lr5e5-e3-s7"}]})
 
     with DecisionModel(base_url="http://test.local", model="de2-v4-lr5e5-e3-s7",
                        calibration=calibration_for("de1"),
                        transport=httpx.MockTransport(handler)) as model:
-        model.readout._tokenizer = StubTokenizer()
+        model.readout._tokenizer = CodeStubTokenizer()
         report = model.health()
     assert report["boundary_check"] == "passed"
     assert report["model_listed"] is True
     assert report["calibration_match"] is False
-    assert report["calibration_mismatch"]
+    assert len(report["calibration_mismatch"]) == 2
     assert report["ok"] is False
 
 
-def test_health_passes_when_the_calibration_matches_the_model():
+def test_health_passes_for_de2_and_checks_every_code():
     def handler(request):
         return httpx.Response(200, json={"data": [{"id": "de2-v4-lr5e5-e3-s7"}]})
 
     with DecisionModel(base_url="http://test.local", model="de2-v4-lr5e5-e3-s7",
                        transport=httpx.MockTransport(handler)) as model:
+        model.readout._tokenizer = CodeStubTokenizer()
+        report = model.health()
+    assert (report["model_family"], report["family_source"]) == ("de2", "model id")
+    assert (report["readout_version"], report["policy"]) == (DE2_READOUT_VERSION, "repeat-think")
+    assert (report["calibration_level"], report["calibration_applied"]) == ("unfitted", False)
+    assert report["slots"]["count"] == MAX_CODES
+    assert report["calibration_match"] is True and report["ok"] is True
+
+
+def test_a_checkpoint_from_the_same_family_passes_health_with_a_note():
+    def handler(request):
+        return httpx.Response(200, json={"data": [{"id": "de1-cont-v1-lr2e5-s7"}]})
+
+    with pytest.warns(UserWarning):
+        model = DecisionModel(base_url="http://test.local", model="de1-cont-v1-lr2e5-s7",
+                              transport=httpx.MockTransport(handler))
+    with model:
         model.readout._tokenizer = StubTokenizer()
         report = model.health()
-    assert report["model_family"] == "de2"
-    assert report["family_explicit"] is True
-    assert report["calibration_match"] is True
+    assert (report["calibration_level"], report["calibration_applied"]) == ("family", False)
+    assert "another checkpoint" in report["calibration_note"][0]
     assert report["ok"] is True
 
 
 # -- the client on an image --------------------------------------------------
 
 def make_image_model(handler, **kwargs) -> DecisionModel:
-    model = DecisionModel(base_url="http://test.local", model="test-model",
+    model = DecisionModel(base_url="http://test.local", model="test-model", family="de1",
                           transport=httpx.MockTransport(handler), **kwargs)
     model.readout._tokenizer = ImageStubTokenizer()
     return model
@@ -1164,10 +1311,10 @@ def test_image_multi_label_asks_one_question_per_label():
 
 
 def test_images_default_to_raw_probabilities_and_can_opt_into_calibration():
-    # The record is pinned explicitly: this test is about the image path opting
-    # into the same scaling the text path applies, which only holds for a record
-    # whose temperature is not 1.0. The fixture model id carries no family slug,
-    # so it resolves to DE-2, whose placeholder record ships T_choice=1.0.
+    # The record is passed explicitly: this test is about the image path opting
+    # into the same scaling the text path applies. The fixture id is not the
+    # checkpoint the bundled DE-1 record was fitted on, so the client would not
+    # apply that record on its own.
     with make_image_model(dual_handler(), calibration=calibration_for("de1")) as model:
         image_default = model.classify({"note": "x"}, {"color": ["red", "blue"]},
                                        image=IMAGE_URL, include_probabilities=True)
@@ -1434,3 +1581,416 @@ def test_overflow_replays_measured_component_distributions():
         assert result["wide"] == case["expected"]
         assert result.answers["wide"].probabilities == case["scores"]
         assert replay.index == len(case["components"])
+
+
+# -- the DE-2 readout ---------------------------------------------------------
+
+class CodeStubTokenizer(StubTokenizer):
+    """A stub where the answer boundary and the two-letter codes are single tokens.
+
+    DE-2 reads codes past `Z` and reads every answer after the terminator, so
+    both have to be one token here the way they are in the checkpoint's tokenizer.
+    Everything else stays one character per token.
+    """
+
+    def __init__(self) -> None:
+        super().__init__()
+        words = [ANSWER_PREFIX] + [code for code in codebook() if len(code) > 1]
+        self.ids = {word: 0x110000 + index for index, word in enumerate(words)}
+        self.ids[ANSWER_PREFIX] = int(ANSWER_TOKEN_ID)
+        self.words = {value: word for word, value in self.ids.items()}
+        self.pattern = re.compile("|".join(re.escape(word) for word in sorted(words, key=len, reverse=True)))
+
+    def apply_chat_template(self, messages, tokenize=False, add_generation_prompt=True, enable_thinking=False):
+        self.templates.append(messages)
+        opened = f"<sys>{messages[0]['content']}<user>{messages[1]['content']}<model>"
+        return opened if enable_thinking else opened + ANSWER_PREFIX
+
+    def encode(self, text: str, add_special_tokens: bool = False) -> list[int]:
+        ids, position = [], 0
+        while position < len(text):
+            match = self.pattern.match(text, position)
+            if match:
+                ids.append(self.ids[match.group()])
+                position = match.end()
+            else:
+                ids.append(ord(text[position]))
+                position += 1
+        return ids
+
+    def decode(self, ids) -> str:
+        return "".join(self.words.get(value) or chr(value) for value in ids)
+
+
+class StubDE2Server:
+    """Answers the three DE-2 request shapes the way vLLM does.
+
+    `logprob(code)` scores a code; `thought` is the token ids a thinking request
+    generates. `candidate_ids` chooses how the server treats `logprob_token_ids`:
+    honoured, ignored (an older server), or rejected with a 400.
+    """
+
+    def __init__(self, logprob=None, thought=None, candidate_ids="honoured", top_k=20, after_thought=None):
+        self.tokenizer = CodeStubTokenizer()
+        self.logprob = logprob or (lambda code: 0.0 if code == "A" else -6.0)
+        self.after_thought = after_thought or self.logprob
+        self.thought = thought
+        self.candidate_ids = candidate_ids
+        self.top_k = top_k
+        self.calls: list[dict] = []
+        self.code_of = {self.tokenizer.encode(code)[0]: code for code in codebook()}
+
+    def __call__(self, request: httpx.Request) -> httpx.Response:
+        body = json.loads(request.content)
+        self.calls.append(body)
+        prompt = body["prompt"]
+        ids = self.tokenizer.encode(prompt) if isinstance(prompt, str) else list(prompt)
+        usage = {"prompt_tokens": len(ids), "completion_tokens": 1}
+        if "stop_token_ids" in body:
+            assert body["return_token_ids"] is True and body["temperature"] == 0
+            generated = list(self.thought)[:body["max_tokens"]]
+            if int(ANSWER_TOKEN_ID) in generated:
+                generated = generated[:generated.index(int(ANSWER_TOKEN_ID)) + 1]
+            return httpx.Response(200, json={"choices": [{"text": "thinking", "token_ids": generated}], "usage": usage})
+        score = self.after_thought if isinstance(prompt, list) else self.logprob
+        if "prompt_logprobs" in body:
+            token = ids[-1]
+            entry = {str(token): {"logprob": score(self.code_of[token]), "rank": 30, "decoded_token": self.code_of[token]}}
+            return httpx.Response(200, json={"choices": [{"prompt_logprobs": [None, entry]}], "usage": usage})
+        assert body["max_tokens"] == 1 and body["temperature"] == 0
+        if "logprob_token_ids" in body and self.candidate_ids == "rejected":
+            return httpx.Response(400, json={"error": {"message": "extra_forbidden: logprob_token_ids"}})
+        if "logprob_token_ids" in body and self.candidate_ids == "honoured":
+            assert len(body["logprob_token_ids"]) <= 128
+            top = {f"token_id:{token}": score(self.code_of[token]) for token in body["logprob_token_ids"]}
+        else:
+            ranked = sorted(codebook(), key=lambda code: -score(code))[:self.top_k]
+            top = {code: score(code) for code in ranked}
+        best = max(codebook(), key=score)
+        return httpx.Response(200, json={"choices": [{"text": best, "logprobs": {"top_logprobs": [top]}}], "usage": usage})
+
+
+def make_de2_model(server: StubDE2Server, **kwargs) -> DecisionModel:
+    model = DecisionModel(base_url="http://test.local", model="de2-test", api_key="",
+                          transport=httpx.MockTransport(server), **kwargs)
+    model.readout._tokenizer = server.tokenizer
+    return model
+
+
+def wide_choice(count: int) -> Choice:
+    return Choice("Which?", {f"k{index}": None for index in range(count)})
+
+
+def test_the_codebook_is_the_letters_then_pinned_pairs():
+    codes = codebook()
+    assert len(codes) == MAX_CODES == 256 and len(set(codes)) == 256
+    assert "".join(codes[:26]) == "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
+    assert codes[26:29] == ("AA", "AB", "AC") and codes[-1] == "IW"
+    assert "GZ" not in codes  # fails the boundary audit on the pinned tokenizer
+    assert codes_for(3) == ["A", "B", "C"] and codes_for(27)[-1] == "AA"
+    with pytest.raises(QuestionError):
+        codes_for(257)
+
+
+def test_a_small_question_renders_the_same_under_either_contract():
+    """Up to 26 options the codes are the letters, so the scaffold is shared."""
+    server = StubDE2Server()
+    with make_de2_model(server) as model:
+        question = wide_choice(26)
+        assert model.readout.render("s", question, max_options=MAX_CODES) == model.readout.render("s", question)
+
+
+def test_the_repeated_and_thinking_prompts():
+    server = StubDE2Server()
+    with make_de2_model(server) as model:
+        readout = model.readout
+        once = readout.render({"a": 1}, wide_choice(3))
+        user = once.split("<user>")[1].split("<model>")[0]
+        twice = readout.render({"a": 1}, wide_choice(3), repeat=2)
+        assert twice == once.replace(user, user + INPUT_REPEAT + user)
+        assert INPUT_REPEAT == "\n\nRead the same input again before answering:\n"
+        thinking = readout.render({"a": 1}, wide_choice(3), thinking=True)
+        # The thought is generated, so the prompt stops before the empty thought block.
+        assert thinking == f"<sys>{THINK_SYSTEM}<user>{user}<model>"
+        assert "no explanation or reasoning" not in THINK_SYSTEM
+        wide = json.loads(readout.render("s", wide_choice(28), max_options=MAX_CODES)
+                          .split("<user>")[1].split("<model>")[0])
+        assert [option["letter"] for option in wide["options"][25:]] == ["Z", "AA", "AB"]
+        with pytest.raises(QuestionError):
+            readout.render("s", wide_choice(28))  # the DE-1 scaffold stops at the letters
+
+
+@pytest.mark.parametrize("count,requests", [(2, 1), (26, 1), (27, 1), (128, 1), (129, 2), (256, 2)])
+def test_every_code_is_read_by_token_id_without_a_fallback(count, requests):
+    server = StubDE2Server(logprob=lambda code: 0.0 if code == "C" else -4.0)
+    with make_de2_model(server, policy="direct") as model:
+        result = model.decide("state", {"wide": wide_choice(max(count, 3))})
+    answer = result.answers["wide"]
+    count = max(count, 3)
+    assert result["wide"] == "k2"
+    assert len(answer.probabilities) == count and sum(answer.probabilities.values()) == pytest.approx(1)
+    assert answer.requests == requests == len(server.calls) and answer.missing_from_top == []
+    assert (answer.strategy, answer.score_semantics, answer.stages) == ("direct", "option-softmax", 1)
+    assert answer.confidence is not None
+    sent = [token for call in server.calls for token in call["logprob_token_ids"]]
+    assert sent == [server.tokenizer.encode(code)[0] for code in codes_for(count)]
+    assert all(call["return_tokens_as_token_ids"] is True and call["logprobs"] == 20 for call in server.calls)
+    assert len({call["prompt"] for call in server.calls}) == 1
+    # A wide DE-2 answer is an ordinary choice on the wire, not an overflow extension.
+    assert set(answer.to_wire()) == {"type", "choice", "probabilities", "confidence"}
+    assert result.meta["readout_version"] == DE2_READOUT_VERSION and result.meta["family"] == "de2"
+    assert result.raw["wide"]["strategy"] == "direct"
+
+
+@pytest.mark.parametrize("mode", ["ignored", "rejected"])
+def test_a_server_without_candidate_ids_falls_back_to_the_top_k(mode):
+    server = StubDE2Server(logprob=lambda code: -0.1 * codebook().index(code), candidate_ids=mode)
+    with make_de2_model(server, policy="direct") as model:
+        first = model.decide("state", {"wide": wide_choice(30)})
+        second = model.decide("state", {"wide": wide_choice(30)})
+    answer = first.answers["wide"]
+    assert first["wide"] == "k0" and len(answer.probabilities) == 30
+    # 20 codes arrive in the top-k; the other 10 cost one request each.
+    assert len(answer.missing_from_top) == 10 and answer.requests == 11
+    assert first.raw["wide"]["ranks"]["AD"] == 30
+    assert sum(answer.probabilities.values()) == pytest.approx(1)
+    if mode == "rejected":
+        # The rejection is remembered: the next question does not ask again.
+        assert sum("logprob_token_ids" in call for call in server.calls) == 1
+        assert second.answers["wide"].requests == 11
+
+
+def test_a_server_that_tokenizes_the_prompt_differently_is_an_error():
+    server = StubDE2Server()
+    def handler(request):
+        response = server(request)
+        body = response.json()
+        body["usage"]["prompt_tokens"] += 1
+        return httpx.Response(200, json=body)
+    with make_de2_model(server) as model:
+        model.readout._client = httpx.Client(base_url="http://test.local", transport=httpx.MockTransport(handler))
+        with pytest.raises(ReadoutError, match="counted .* prompt tokens"):
+            model.decide("state", {"q": Noul("Yes?")})
+
+
+def test_a_prompt_that_does_not_end_at_the_answer_boundary_is_an_error():
+    server = StubDE2Server()
+    with make_de2_model(server) as model:
+        slots = model.readout.code_slots(2)
+        with pytest.raises(ReadoutError, match="does not end on"):
+            model.readout.read_codes("<sys>x<user>y<model>", slots)
+    assert not server.calls
+
+
+def test_a_code_that_is_not_one_token_fails_loudly():
+    server = StubDE2Server()
+    with make_de2_model(server) as model:
+        model.readout._tokenizer = ImageStubTokenizer()  # two-letter codes are two tokens here
+        with pytest.raises(ReadoutError, match="not one token"):
+            model.decide("state", {"wide": wide_choice(27)})
+    assert not server.calls
+
+
+def test_a_confident_repeated_read_is_the_answer():
+    server = StubDE2Server(logprob=lambda code: 0.0 if code == "B" else -5.0)
+    with make_de2_model(server) as model:
+        result = model.decide("state", {"q": wide_choice(3)}, debug=True)
+    answer = result.answers["q"]
+    assert result["q"] == "k1" and len(server.calls) == 1
+    assert (answer.strategy, answer.stages, answer.requests, answer.thought_tokens) == ("repeat2", 1, 1, 0)
+    assert answer.thought_closed is None and "thought_tokens" not in answer.to_dict()
+    assert server.calls[0]["prompt"].count(INPUT_REPEAT) == 1
+    assert result.usage["output_tokens"] == 1 and result.usage["thought_tokens"] == 0
+    assert result.meta["policy"] == "repeat-think" and result.meta["think_gate"] == 0.7
+    assert result.meta["strategy_by_head"] == {"q": "repeat2"}
+    assert result.raw["q"]["components"][0]["prompt"] == server.calls[0]["prompt"]
+
+
+def test_an_unsure_read_thinks_and_answers_after_the_thought():
+    close = int(ANSWER_TOKEN_ID)
+    thought = [ord(character) for character in "<think>3+4=7"] + [close, ord("B")]
+    server = StubDE2Server(logprob=lambda code: {"A": -0.7, "B": -0.8}.get(code, -3.0), thought=thought,
+                           after_thought=lambda code: 0.0 if code == "B" else -7.0)
+    with make_de2_model(server) as model:
+        result = model.decide("state", {"q": wide_choice(3)}, debug=True)
+    answer = result.answers["q"]
+    first, think, last = server.calls
+    assert result["q"] == "k1"  # the repeated read preferred k0; the thought changed it
+    assert (answer.strategy, answer.stages, answer.logical_reads, answer.requests) == ("repeat2-think", 2, 2, 3)
+    assert (answer.thought_tokens, answer.thought_closed) == (len(thought) - 2, True)
+    assert answer.calibrated is False
+    # The thought is generated from the thinking prompt, greedily, up to the budget.
+    assert think["prompt"].startswith(f"<sys>{THINK_SYSTEM}<user>") and think["prompt"].endswith("<model>")
+    assert think["max_tokens"] == 1024 and think["stop_token_ids"] == [close]
+    # The codes are read after the thought and the close token, token for token.
+    tokenizer = server.tokenizer
+    assert last["prompt"] == tokenizer.encode(think["prompt"]) + thought[:-2] + [close]
+    assert len(last["logprob_token_ids"]) == 3
+    assert result.usage["requests"] == 3 and result.usage["thought_tokens"] == len(thought) - 2
+    assert result.usage["output_tokens"] == 2 + len(thought) - 2
+    raw = result.raw["q"]
+    assert [stage["stage"] for stage in raw["components"]] == ["repeat2", "think"]
+    assert raw["components"][0]["probabilities"]["A"] > raw["components"][0]["probabilities"]["B"]
+    assert raw["thought"] == "thinking" and raw["thought_closed"] is True
+    assert answer.to_dict()["thought_tokens"] == len(thought) - 2
+
+
+def test_a_thought_cut_by_the_budget_is_closed_by_the_client():
+    thought = [ord("x")] * 50
+    server = StubDE2Server(logprob=lambda code: -1.0, thought=thought)
+    with make_de2_model(server, think_budget=8) as model:
+        result = model.decide("state", {"q": Noul("Yes?")})
+    answer = result.answers["q"]
+    assert (answer.thought_tokens, answer.thought_closed) == (8, False)
+    assert server.calls[1]["max_tokens"] == 8
+    assert server.calls[2]["prompt"][-9:] == [ord("x")] * 8 + [int(ANSWER_TOKEN_ID)]
+
+
+@pytest.mark.parametrize("policy,gate,count,thinks", [
+    ("repeat-think", 0.7, 3, True),
+    ("repeat-think", 0.2, 3, False),   # the top probability clears a lower gate
+    ("repeat-think", 0.7, 27, False),  # questions above 26 options never think
+    ("repeat", 0.7, 3, False),
+    ("direct", 0.7, 3, False),
+])
+def test_the_gate_the_option_cap_and_the_policy_decide_whether_to_think(policy, gate, count, thinks):
+    server = StubDE2Server(logprob=lambda code: -1.0, thought=[ord("x"), int(ANSWER_TOKEN_ID)])
+    with make_de2_model(server, policy=policy, think_gate=gate) as model:
+        answer = model.decide("state", {"q": wide_choice(count)}).answers["q"]
+    assert (answer.strategy == "repeat2-think") is thinks
+    assert len(server.calls) == (3 if thinks else 1)
+    assert (INPUT_REPEAT in server.calls[0]["prompt"]) is (policy != "direct")
+
+
+def test_a_server_that_returns_no_thought_tokens_is_an_error():
+    server = StubDE2Server(logprob=lambda code: -1.0)
+    def handler(request):
+        if "stop_token_ids" in json.loads(request.content):
+            return httpx.Response(200, json={"choices": [{"text": "thinking"}], "usage": {}})
+        return server(request)
+    with make_de2_model(server) as model:
+        model.readout._client = httpx.Client(base_url="http://test.local", transport=httpx.MockTransport(handler))
+        with pytest.raises(ReadoutError, match="return_token_ids"):
+            model.decide("state", {"q": Noul("Yes?")})
+
+
+def test_de2_reads_typed_heads_and_keeps_their_limits():
+    server = StubDE2Server(logprob=lambda code: 0.0 if code == "A" else -5.0)
+    with make_de2_model(server) as model:
+        result = model.decide("state", {"n": Noul("Yes?"), "s": Score("Level?", ["low", "mid", "high"])})
+        assert result["n"] > 0.99 and result.answers["s"].level == "low"
+        assert result.to_wire()["answers"]["n"] == {"type": "noul", "noul": result["n"]}
+        assert result.meta["calibrated"] is False and result.answers["n"].temperature == 1.0
+        tags = model.classify("state", {"tags": {"labels": ["x", "y"], "multi_label": True}})
+        assert tags["tags"] == ["x", "y"]
+        before = len(server.calls)
+        # Only a text choice goes past the letters.
+        for question, kwargs in ((wide_choice(257), {}), (Score("Level?", list(range(27))), {}),
+                                 (wide_choice(27), {"image": IMAGE_URL})):
+            with pytest.raises(QuestionError):
+                model.decide("state", {"small": Noul("Yes?"), "wide": question}, **kwargs)
+        # Nothing is fitted for DE-2, so asking for calibration returns raw answers.
+        asked = model.decide("state", {"n": Noul("Yes?")}, calibrated=True)
+        assert asked.answers["n"].calibrated is False and asked.meta["calibrated"] is False
+    assert len(server.calls) == before + 1
+
+
+def test_de1_still_overflows_where_de2_reads_natively():
+    calls = []
+    def handler(request):
+        calls.append(json.loads(request.content))
+        n = len(json.loads(calls[-1]["prompt"].split("<user>")[1].split("<model>")[0])["options"])
+        return httpx.Response(200, json=top_logprobs({chr(65 + i): -float(i) for i in range(n)}))
+    with DecisionModel(readout=make_readout(handler)) as de1:
+        assert de1.decide("state", {"wide": wide_choice(77)}).answers["wide"].strategy == "finalist-top1"
+    assert len(calls) == 4 and all("logprob_token_ids" not in call for call in calls)
+    server = StubDE2Server()
+    with make_de2_model(server) as de2:
+        assert de2.decide("state", {"wide": wide_choice(77)}).answers["wide"].strategy == "repeat2"
+    assert len(server.calls) == 1
+
+
+def test_read_policy_rejects_an_unknown_policy():
+    server = StubDE2Server()
+    with make_de2_model(server) as model:
+        with pytest.raises(ValueError, match="unknown policy"):
+            read_policy(model.readout, "state", Noul("Yes?"), policy="twice")
+
+
+# -- the system turn on the image path ----------------------------------------
+
+def image_prompt_logprobs(tokenizer, prompt: str, *, space: bool) -> list:
+    """Server-side prompt tokens for a chat render, with or without the parts-format space."""
+    if space:
+        prompt = prompt.replace(DIRECT_SYSTEM, DIRECT_SYSTEM + " ")
+    ids = tokenizer.encode(prompt)
+    return [None] + [{str(token): {"logprob": -0.1, "decoded_token": tokenizer.decode([token])}} for token in ids[1:]]
+
+
+@pytest.mark.parametrize("space,render", [(False, "string"), (True, "differs")])
+def test_the_image_read_records_how_the_server_rendered_the_system_turn(space, render):
+    tokenizer = CodeStubTokenizer()
+    def handler(request):
+        body = chat_response({"A": -0.1, "B": -3.0})
+        prompt = tokenizer.apply_chat_template(
+            [{"role": "system", "content": DIRECT_SYSTEM}, {"role": "user", "content": "<image>{}"}])
+        body["prompt_logprobs"] = image_prompt_logprobs(tokenizer, prompt, space=space)
+        return httpx.Response(200, json=body)
+
+    # Both families record the render and answer either way: a stock vLLM writes
+    # the space on every image request, and that is the image path as served.
+    for model_id, readout_version in (("shisa-ai/shisa-de-1", READOUT_VERSION), ("de2-test", DE2_READOUT_VERSION)):
+        with DecisionModel(base_url="http://test.local", model=model_id,
+                           transport=httpx.MockTransport(handler)) as model:
+            model.readout._tokenizer = tokenizer
+            result = model.decide({}, {"q": image_question()}, image=IMAGE_URL)
+            assert result.raw["q"]["system_render"] == render and result["q"] == "label0"
+            # An image is one direct read under either contract: no repeat, no thought.
+            assert (result.answers["q"].strategy, result.answers["q"].requests) == ("direct", 1)
+            assert result.meta["input_type"] == "image" and result.meta["readout_version"] == readout_version
+            # A caller with a fixed template can make the difference an error.
+            payload = (model.readout, {}, image_question(), IMAGE_URL)
+            if space:
+                with pytest.raises(ReadoutError, match="system render: differs"):
+                    payload[0].read_image(*payload[1:], require_string_system=True)
+            else:
+                assert payload[0].read_image(*payload[1:], require_string_system=True).system_render == "string"
+
+
+def test_a_response_without_the_prompt_tokens_leaves_the_render_unverified():
+    with make_image_model(dual_handler()) as model:
+        assert model.decide({}, {"q": image_question()}, image=IMAGE_URL).raw["q"]["system_render"] == "unverified"
+        with pytest.raises(ReadoutError, match="system render: unverified"):
+            model.readout.read_image({}, image_question(), IMAGE_URL, require_string_system=True)
+
+
+def test_doctor_probe_reports_the_read_and_the_chat_render(capsys):
+    from shisa_de import cli
+
+    server = StubDE2Server()
+    def handler(request):
+        if request.url.path == "/v1/models":
+            return httpx.Response(200, json={"data": [{"id": "de2-test"}]})
+        if request.url.path == "/v1/chat/completions":
+            body = json.loads(request.content)
+            prompt = server.tokenizer.apply_chat_template(body["messages"])
+            return httpx.Response(200, json={
+                "choices": [], "prompt_logprobs": image_prompt_logprobs(server.tokenizer, prompt, space=True)})
+        return server(request)
+
+    def factory(**kwargs):
+        built = DecisionModel(transport=httpx.MockTransport(handler), **kwargs)
+        built.readout._tokenizer = server.tokenizer
+        return built
+
+    import shisa_de.cli as cli_module
+    original = cli_module.DecisionModel
+    cli_module.DecisionModel = factory
+    try:
+        assert cli.main(["doctor", "--probe", "--base-url", "http://test.local", "--model", "de2-test"]) == 0
+    finally:
+        cli_module.DecisionModel = original
+    output = capsys.readouterr().out
+    assert "read probe      passed (repeat2, 1 requests)" in output
+    assert "chat system     differs" in output
+    assert "family          de2 (model id)" in output and "de2-codebook-v1, policy repeat-think" in output

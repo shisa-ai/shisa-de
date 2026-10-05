@@ -3,6 +3,9 @@
 `doctor` checks an endpoint before you depend on it. `ask` is the one-line
 classification call. `explain` prints every step of the readout for one
 question, which is the fastest way to see what the model actually receives.
+
+All three read DE-1 or DE-2, chosen from `--family`, the model id or the
+tokenizer source. For DE-2, `explain` shows the first read of the policy.
 """
 
 from __future__ import annotations
@@ -14,7 +17,9 @@ from typing import Any
 
 from .calibration import CALIBRATION_FILES, resolve_calibration
 from .client import DEFAULT_ENDPOINT, DEFAULT_MODEL, DecisionModel, _api_key_from_env
-from .readout import LETTERS, READOUT_VERSION
+from .family import FAMILIES
+from .policy import POLICIES
+from .readout import INPUT_REPEAT, LETTERS, MAX_CODES
 from .questions import Choice
 
 
@@ -50,6 +55,11 @@ def _common(parser: argparse.ArgumentParser) -> None:
         help=("calibration record: a family (" + ", ".join(sorted(CALIBRATION_FILES))
               + ") or a path to a record. Default: chosen from the served model id"),
     )
+    parser.add_argument("--family", default=None, choices=FAMILIES,
+                        help="the contract the served model is read through. Default: taken from "
+                             "the model id, then the tokenizer, otherwise assumed to be de2")
+    parser.add_argument("--policy", default=None, choices=POLICIES,
+                        help="the DE-2 read. Default: repeat-think for de2; de1 is always direct")
     parser.add_argument("--timeout", type=float, default=120.0)
 
 
@@ -60,6 +70,8 @@ def build_parser() -> argparse.ArgumentParser:
     doctor = sub.add_parser("doctor", help="check an endpoint, the served model, and the answer boundary")
     _common(doctor)
     doctor.add_argument("--json", action="store_true", help="print the report as JSON")
+    doctor.add_argument("--probe", action="store_true",
+                        help="also send one question and one chat request to check the served reads")
 
     ask = sub.add_parser("ask", help="classify a state against a label set")
     _common(ask)
@@ -81,35 +93,43 @@ def build_parser() -> argparse.ArgumentParser:
 
 
 def main(argv: list[str] | None = None) -> int:
-    args = build_parser().parse_args(argv)
-    model = DecisionModel(
-        base_url=args.base_url, model=args.model, tokenizer=args.tokenizer, timeout=args.timeout,
-        image_top_logprobs=getattr(args, "image_top_logprobs", 20),
-        calibration=resolve_calibration(getattr(args, "calibration", None)),
-    )
+    parser = build_parser()
+    args = parser.parse_args(argv)
+    try:
+        model = DecisionModel(
+            base_url=args.base_url, model=args.model, tokenizer=args.tokenizer, timeout=args.timeout,
+            image_top_logprobs=getattr(args, "image_top_logprobs", 20),
+            calibration=resolve_calibration(args.calibration),
+            family=args.family, policy=args.policy,
+        )
+    except ValueError as exc:
+        parser.error(str(exc))
     with model:
         if args.command == "doctor":
-            report = model.health()
+            report = model.health(probe=args.probe)
             if args.json:
                 print(json.dumps(report, indent=2))
             else:
                 print(f"endpoint        {report['base_url']}")
                 print(f"model           {report['model']}")
-                print(f"family          {report['model_family']}"
-                      f"{' (assumed)' if not report.get('family_explicit') else ''}")
-                print(f"readout         {report['readout_version']}")
+                print(f"family          {report['model_family']} ({report['family_source']})")
+                print(f"readout         {report['readout_version']}, policy {report['policy']}")
                 print(f"calibration     {report['calibration']}")
                 print(f"  fitted on     {report.get('calibration_model')} "
                       f"({report.get('calibration_readout_version')}, "
                       f"{report.get('calibration_serving_shape')})")
-                print(f"  match         {'yes' if report.get('calibration_match') else 'NO'}")
-                for reason in report.get("calibration_mismatch", []):
+                print(f"  match         {report['calibration_level'] if report.get('calibration_match') else 'NO'}")
+                print(f"  applied       {'yes' if report.get('calibration_applied') else 'no'}")
+                for reason in report.get("calibration_mismatch", []) + report.get("calibration_note", []):
                     print(f"                {reason}")
                 print(f"models endpoint {report.get('models_status')}")
                 if report.get("served_models") is not None:
                     listed = "yes" if report.get("model_listed") else "no"
                     print(f"model listed    {listed} (of {len(report['served_models'])} served ids)")
                 print(f"boundary check  {report.get('boundary_check')}")
+                if "read_probe" in report:
+                    print(f"read probe      {report['read_probe']}")
+                    print(f"chat system     {report['chat_system_render']}")
                 if report.get("family_note"):
                     print(f"note            {report['family_note']}")
                 print(f"ok              {report['ok']}")
@@ -143,10 +163,19 @@ def _explain(model: DecisionModel, args: argparse.Namespace) -> int:
         criteria={label: None for label in label_list},
     )
     readout = model.readout
-    prompt = readout.render(state, question)
     options = question.options()
-    slots = readout.slots(len(options))
-    readout.check_boundary(prompt, slots)
+    de2 = model.family == "de2"
+    if de2:
+        # The first read of the DE-2 policy. A thought, when the gate asks for
+        # one, follows this read and is not shown here.
+        repeat = 1 if model.policy == "direct" else 2
+        prompt = readout.render(state, question, repeat=repeat, max_options=MAX_CODES)
+        slots = readout.code_slots(len(options))
+        readout.check_code_boundary(readout.ensure_tokenizer().encode(prompt, add_special_tokens=False), slots)
+    else:
+        prompt = readout.render(state, question)
+        slots = readout.slots(len(options))
+        readout.check_boundary(prompt, slots)
 
     print("1. The prompt the model receives")
     print("-" * 72)
@@ -157,16 +186,24 @@ def _explain(model: DecisionModel, args: argparse.Namespace) -> int:
     for slot in slots:
         print(f"   {slot.letter}  token {slot.token_id:>6}")
     print()
-    read = readout.read(prompt, len(options), debug=True)
-    print("3. One request: max_tokens 1, temperature 0, logprobs 20")
+    body: dict[str, Any] = {"model": model.model, "prompt": prompt, "max_tokens": 1, "temperature": 0,
+                            "logprobs": readout.max_logprobs}
+    if de2:
+        read = readout.read_codes(prompt, slots, debug=True)
+        body.update(return_tokens_as_token_ids=True, logprob_token_ids=[slot.token_id for slot in slots])
+        print(f"3. One request: max_tokens 1, temperature 0, the {len(slots)} answer codes by token id")
+    else:
+        read = readout.read(prompt, len(options), debug=True)
+        print(f"3. One request: max_tokens 1, temperature 0, logprobs {readout.max_logprobs}")
     print("-" * 72)
     print(f"   POST {model.base_url}/v1/completions")
     print(f"   prompt tokens {read.prompt_tokens}, requests {read.requests}, sampled {read.sampled!r}")
+    marks = {slot.letter: slot.letter for slot in slots} | {f"token_id:{slot.token_id}": slot.letter for slot in slots}
     for token, logprob in sorted(read.top_logprobs.items(), key=lambda kv: -kv[1]):
-        marker = "  <- answer slot" if token in [slot.letter for slot in slots] else ""
-        print(f"   {token!r:>14}  {logprob:9.4f}{marker}")
+        marker = f"  <- answer slot {marks[token]}" if token in marks else ""
+        print(f"   {token!r:>18}  {logprob:9.4f}{marker}")
     if read.missing_from_top:
-        print(f"   fallback requests for letters outside the top 20: {', '.join(read.missing_from_top)}")
+        print(f"   fallback requests for codes not returned: {', '.join(read.missing_from_top)}")
     print()
     print("4. The distribution over the option letters")
     print("-" * 72)
@@ -177,14 +214,24 @@ def _explain(model: DecisionModel, args: argparse.Namespace) -> int:
     print()
     print("5. The same request without Python")
     print("-" * 72)
-    body = {"model": model.model, "prompt": prompt, "max_tokens": 1, "temperature": 0, "logprobs": 20}
     print(f"curl -s {shlex.quote(model.base_url + '/v1/completions')} \\")
     print("  -H 'Content-Type: application/json' \\")
     if _api_key_from_env():
         print('  -H "Authorization: Bearer ${SHISA_DE_API_KEY:-$SHISA_API_KEY}" \\')
     print(f"  -d {shlex.quote(json.dumps(body))}")
     print()
-    print(f"readout {READOUT_VERSION}; {len(LETTERS)} letters available, {len(options)} used")
+    if de2:
+        top = max(read.probabilities.values())
+        would = (model.policy == "repeat-think" and top < model.think_gate and len(options) <= 26)
+        print(f"readout {model.readout_version}, policy {model.policy}; {MAX_CODES} codes available, "
+              f"{len(options)} used")
+        if model.policy != "direct":
+            print(f"the user turn is written twice, joined by {INPUT_REPEAT!r}")
+        if model.policy == "repeat-think":
+            print(f"top probability {top:.4f} against the gate {model.think_gate}: "
+                  f"{'a thought would follow this read' if would else 'this read is the answer'}")
+    else:
+        print(f"readout {model.readout_version}; {len(LETTERS)} letters available, {len(options)} used")
     return 0
 
 

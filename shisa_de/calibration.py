@@ -14,17 +14,22 @@ provides no evidence about another. Every answer says which calibration was
 applied, including the model it was fitted on, because a threshold fitted
 against one readout, one serving shape, or one checkpoint does not transfer to
 another.
+
+A record is applied on its own only to the checkpoint it was fitted on, read
+through a readout its fit still describes (`Calibration.applicability`). The
+DE-2 record is unfitted, so DE-2 answers are raw until someone fits one.
 """
 
 from __future__ import annotations
 
 import json
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from importlib import resources
 from pathlib import Path
 from typing import Any
 
-from .family import model_family
+from .family import FAMILIES, model_family, normalize_family
+from .readout import calibration_compatible
 
 CALIBRATION_FILE = "data/calibration.json"
 
@@ -81,6 +86,13 @@ class Calibration:
     source: str
     family: str = "de1"
     note: str = ""
+    #: A fit that was made and deliberately not shipped, kept for its provenance.
+    withheld: dict[str, Any] = field(default_factory=dict)
+
+    @property
+    def fitted(self) -> bool:
+        """Whether the record changes any probability. An unfitted record is all 1.0."""
+        return any(float(value) != 1.0 for value in self.temperatures.values())
 
     @property
     def id(self) -> str:
@@ -101,23 +113,50 @@ class Calibration:
         key = "noul" if question_type == "noul" else "choice"
         return float(self.temperatures.get(key, 1.0))
 
-    def matches(self, model: str, readout_version: str) -> tuple[bool, list[str]]:
-        """Whether this record applies to a served model under a readout.
+    def applicability(self, model: str, readout_version: str, *, family: str | None = None,
+                      tokenizer: str | None = None) -> tuple[str, list[str]]:
+        """How far this record applies to a served model under a readout.
 
-        Returns `(ok, reasons)`. The reasons name each field that disagrees, so
-        a caller can report the mismatch instead of a bare false.
+        Returns `(level, reasons)`:
+
+        - `mismatch`: the family differs, or the record was fitted against a
+          readout whose answers this one does not reproduce. Never applied
+          unless the caller passes the record explicitly, and `doctor` fails.
+        - `family`: right family and readout, but fitted on another checkpoint.
+          Not applied unless the caller passes the record explicitly.
+        - `checkpoint`: fitted on this checkpoint. Applied.
+        - `unfitted`: the record holds no temperature, so there is nothing to
+          apply and nothing to mismatch on.
+
+        The checkpoint is recognised by the served model id or, for a server
+        that aliases it, by the tokenizer source. `family` is the family the
+        client resolved; it defaults to reading the model id.
         """
+        served = family or model_family(model)
         reasons: list[str] = []
-        if self.family != model_family(model):
+        if self.family != served:
+            reasons.append(f"fitted for family {self.family!r} but {model!r} is read as {served!r}")
+        if not calibration_compatible(self.readout_version, readout_version):
             reasons.append(
-                f"fitted for family {self.family!r} but {model!r} is {model_family(model)!r}"
+                f"fitted against readout {self.readout_version!r}, whose answers "
+                f"{readout_version!r} does not reproduce"
             )
-        if self.readout_version != readout_version:
-            reasons.append(
-                f"fitted against readout {self.readout_version!r} but this client reads "
-                f"{readout_version!r}"
-            )
-        return (not reasons), reasons
+        if reasons:
+            return "mismatch", reasons
+        if not self.fitted:
+            return "unfitted", []
+        names = {str(name).lower() for name in (model, tokenizer) if name}
+        if self.model.lower() in names:
+            return "checkpoint", []
+        return "family", [f"fitted on {self.model!r}, not on {model!r}: same family, another checkpoint"]
+
+    def matches(self, model: str, readout_version: str, **kwargs: Any) -> tuple[bool, list[str]]:
+        """Whether this record can describe a served model at all: `(ok, reasons)`.
+
+        False only for a `mismatch`; see `applicability` for the finer levels.
+        """
+        level, reasons = self.applicability(model, readout_version, **kwargs)
+        return level != "mismatch", reasons if level == "mismatch" else []
 
 
 def load_calibration(name: str = CALIBRATION_FILE) -> Calibration:
@@ -147,27 +186,33 @@ def calibration_from_dict(raw: dict[str, Any], origin: str = "") -> Calibration:
         source=raw.get("source", ""),
         family=raw.get("family") or model_family(model),
         note=raw.get("note", ""),
+        withheld=dict(raw.get("withheld") or {}),
     )
 
 
 def calibration_for(family: str) -> Calibration:
     """The shipped record for a family."""
-    if family not in CALIBRATION_FILES:
-        raise ValueError(f"unknown family {family!r}; expected one of {sorted(CALIBRATION_FILES)}")
-    return load_calibration(CALIBRATION_FILES[family])
+    return load_calibration(CALIBRATION_FILES[normalize_family(family)])
 
 
 def resolve_calibration(spec: str | None) -> Calibration | None:
     """Resolve a `--calibration` argument.
 
-    Accepts a family name (`de1`, `de2`) or a path to a record. `None` or
-    `"auto"` means "let the client pick from the served model id".
+    Accepts a family name in any common spelling (`de1`, `DE-2`) or a path to a
+    record. `None` or `"auto"` means "let the client pick from the served model".
     """
     if spec is None or spec == "auto":
         return None
-    if spec in CALIBRATION_FILES:
+    try:
         return calibration_for(spec)
-    return load_calibration_file(spec)
+    except ValueError:
+        pass
+    try:
+        return load_calibration_file(spec)
+    except FileNotFoundError as exc:
+        raise ValueError(
+            f"--calibration {spec!r} is neither a family ({', '.join(FAMILIES)}) nor a record file"
+        ) from exc
 
 
 __all__ = [

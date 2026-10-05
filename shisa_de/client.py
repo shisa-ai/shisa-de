@@ -7,15 +7,18 @@ Two entry points, both on `DecisionModel`:
 - `decide(state, {"route": Choice(...), "urgent": Noul(...)})` is the full
   System One call, with the three question types and their typed answers.
 
-Questions run concurrently over a bounded head pool. Text choices above 26
-options use balanced chunks and a final choice among chunk winners. Every
-answer records its strategy and cost.
+Questions run concurrently over a bounded head pool. The served model's family
+picks the contract: DE-1 answers from one read, and its text choices above 26
+options use balanced chunks and a final choice among chunk winners; DE-2 reads
+the question twice, thinks when that read is unsure, and reads text choices up
+to 256 options in one prompt. Every answer records its strategy and cost.
 """
 
 from __future__ import annotations
 
 import os
 import time
+import warnings
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -30,11 +33,20 @@ from .calibration import (
     temper_binary,
     temper_distribution,
 )
-from .family import family_is_explicit, model_family
+from .family import resolve_family
 from .images import prepare_image
 from .questions import MAX_OPTIONS, Choice, Noul, Question, QuestionError, Score
 from .overflow import OVERFLOW_STRATEGY, OverflowRead, read_overflow, validate_overflow
-from .readout import LETTERS, READOUT_VERSION, LetterRead, Readout, ReadoutError
+from .policy import (
+    DEFAULT_POLICY,
+    FAMILY_POLICIES,
+    THINK_BUDGET,
+    THINK_GATE,
+    THINK_OPTION_CAP,
+    PolicyRead,
+    read_policy,
+)
+from .readout import MAX_CODES, READOUT_VERSIONS, LetterRead, Readout, ReadoutError, codes_for
 
 DEFAULT_ENDPOINT = "https://api.shisa.ai/openai"
 DEFAULT_MODEL = "shisa-ai/shisa-de-1"
@@ -58,6 +70,8 @@ class Answer:
     stages: int = 1
     logical_reads: int = 1
     finalists: list[str] | None = None
+    thought_tokens: int = 0
+    thought_closed: bool | None = None
     choice: str | None = None
     noul: float | None = None
     score: float | None = None
@@ -103,7 +117,7 @@ class Answer:
         }
         if self.confidence is not None:
             out["confidence"] = self.confidence
-        if self.strategy != "direct":
+        if self.score_semantics != "option-softmax":
             out.update(strategy=self.strategy, score_semantics=self.score_semantics,
                        calibrated=False)
         return out
@@ -119,6 +133,8 @@ class Answer:
                    stages=self.stages, logical_reads=self.logical_reads)
         if self.finalists is not None:
             out["finalists"] = list(self.finalists)
+        if self.thought_closed is not None:
+            out.update(thought_tokens=self.thought_tokens, thought_closed=self.thought_closed)
         return out
 
 
@@ -254,10 +270,16 @@ def _multi_label_question(head: str) -> str:
 
 
 class DecisionModel:
-    """A client for a served DE-1 decision model.
+    """A client for a served DE-1 or DE-2 decision model.
 
     The model is served, never loaded: this class holds an HTTP client and a
     tokenizer, and the weights stay on the GPU server.
+
+    ``family`` declares which contract the served checkpoint is read through
+    (``"de1"`` or ``"de2"``). Left unset it is taken from the model id, then the
+    tokenizer source, and otherwise assumed to be DE-2 with a warning.
+    ``policy`` selects the DE-2 read: ``"repeat-think"`` (the default),
+    ``"repeat"`` or ``"direct"``; DE-1 is always ``"direct"``.
     """
 
     def __init__(
@@ -275,6 +297,10 @@ class DecisionModel:
         max_logprobs: int = 20,
         overflow: str = OVERFLOW_STRATEGY,
         calibration: Calibration | None = None,
+        family: str | None = None,
+        policy: str | None = None,
+        think_gate: float = THINK_GATE,
+        think_budget: int = THINK_BUDGET,
         transport: httpx.BaseTransport | None = None,
         readout: Readout | None = None,
     ) -> None:
@@ -282,13 +308,47 @@ class DecisionModel:
         if self.base_url.endswith("/v1"):
             self.base_url = self.base_url[:-3]
         self.model = model or DEFAULT_MODEL
-        # The calibration has to match the checkpoint, so it is chosen from the
-        # served id rather than shipped as a single global record. An id with no
-        # DE-1 slug is read as DE-2; `family_is_explicit` records whether that
-        # was a declared family or an assumption.
-        self.family = model_family(self.model)
-        self.family_explicit = family_is_explicit(self.model)
-        self.calibration = calibration if calibration is not None else calibration_for(self.family)
+        # The family picks the contract: the readout version, the policy, the
+        # option limit and the calibration record. It is resolved once, here, and
+        # its source is kept so an assumption is never presented as a detection.
+        tokenizer_source = tokenizer or getattr(readout, "tokenizer_source", None)
+        self.family, self.family_source = resolve_family(self.model, tokenizer_source, family)
+        self.family_explicit = self.family_source != "assumed"
+        if not self.family_explicit:
+            warnings.warn(
+                f"{self.model!r} names neither DE-1 nor DE-2, so it is read as {self.family!r}; "
+                "pass family='de1' or family='de2' to say which contract it was trained for",
+                stacklevel=2,
+            )
+        self.readout_version = READOUT_VERSIONS[self.family]
+        self.policy = policy or DEFAULT_POLICY[self.family]
+        if self.policy not in FAMILY_POLICIES[self.family]:
+            raise ValueError(
+                f"policy {self.policy!r} is not defined for {self.family}; "
+                f"expected one of {list(FAMILY_POLICIES[self.family])}"
+            )
+        if not 0.0 <= float(think_gate) <= 1.0:
+            raise ValueError("think_gate must be a probability")
+        if isinstance(think_budget, bool) or not isinstance(think_budget, int) or think_budget < 1:
+            raise ValueError("think_budget must be a positive integer")
+        self.think_gate = float(think_gate)
+        self.think_budget = think_budget
+        # A record chosen for the caller is applied only to the checkpoint it was
+        # fitted on. A record the caller passes is their assertion and is applied
+        # as given; `health` still reports how far it matches.
+        supplied = calibration is not None
+        self.calibration = calibration if supplied else calibration_for(self.family)
+        self.calibration_level, self.calibration_reasons = self.calibration.applicability(
+            self.model, self.readout_version, family=self.family, tokenizer=tokenizer_source)
+        self.calibration_applied = self.calibration.fitted and (
+            supplied or self.calibration_level == "checkpoint")
+        if self.calibration.fitted and not self.calibration_applied:
+            warnings.warn(
+                f"the bundled {self.family} calibration is not applied to {self.model!r}: "
+                f"{'; '.join(self.calibration_reasons)}. Answers are raw probabilities; pass "
+                "calibration= to apply a record you vouch for",
+                stacklevel=2,
+            )
         self.max_workers = max(1, int(max_workers))
         if overflow not in (OVERFLOW_STRATEGY, "error"):
             raise ValueError("overflow must be 'finalist-top1' or 'error'")
@@ -341,25 +401,34 @@ class DecisionModel:
     def __exit__(self, *exc: object) -> None:
         self.close()
 
-    def health(self) -> dict[str, Any]:
+    def health(self, probe: bool = False) -> dict[str, Any]:
         """Check the endpoint, the served model id, the answer boundary, and the calibration.
 
-        A passing boundary check says the answer letters were read from the right
+        A passing boundary check says the answer codes were read from the right
         position. It says nothing about whether the temperatures applied to them
         belong to this checkpoint, which is a separate failure and a silent one,
         so the calibration's provenance is checked here too and a mismatch fails
         the report.
+
+        ``probe=True`` also spends requests: one question through the family's
+        own read, which fails the report if the server cannot serve it, and one
+        text-only chat request that reports how the server renders the system
+        turn, which is what the image path depends on.
         """
         report: dict[str, Any] = {
             "base_url": self.base_url,
             "model": self.model,
             "model_family": self.family,
+            "family_source": self.family_source,
             "family_explicit": self.family_explicit,
-            "readout_version": READOUT_VERSION,
+            "readout_version": self.readout_version,
+            "policy": self.policy,
             "calibration": self.calibration.id,
             "calibration_model": self.calibration.model,
             "calibration_readout_version": self.calibration.readout_version,
             "calibration_serving_shape": self.calibration.serving_shape,
+            "calibration_level": self.calibration_level,
+            "calibration_applied": self.calibration_applied,
             "ok": False,
         }
         if not self.family_explicit:
@@ -367,10 +436,12 @@ class DecisionModel:
                 f"{self.model!r} carries no DE-1 or DE-2 slug; {self.family!r} was assumed, "
                 "not detected"
             )
-        matched, reasons = self.calibration.matches(self.model, READOUT_VERSION)
+        matched = self.calibration_level != "mismatch"
         report["calibration_match"] = matched
         if not matched:
-            report["calibration_mismatch"] = reasons
+            report["calibration_mismatch"] = list(self.calibration_reasons)
+        elif self.calibration_reasons:
+            report["calibration_note"] = list(self.calibration_reasons)
         try:
             ids = self.readout.list_models()
             report["models_status"] = 200
@@ -378,15 +449,34 @@ class DecisionModel:
             report["model_listed"] = self.model in ids
         except (httpx.HTTPError, ReadoutError) as exc:
             report["models_status"] = f"error: {exc}"
+        question = Noul(instructions="Is this a health check?")
         try:
-            slots = self.readout.slots(2)
-            prompt = self.readout.render({"health": "check"}, Noul(instructions="Is this a health check?"))
-            self.readout.check_boundary(prompt, slots)
+            if self.family == "de2":
+                # Every code the contract can use, not only the two a noul needs.
+                slots = self.readout.code_slots(MAX_CODES)
+                prompt = self.readout.render({"health": "check"}, question,
+                                             repeat=1 if self.policy == "direct" else 2)
+                tokenizer = self.readout.ensure_tokenizer()
+                self.readout.check_code_boundary(tokenizer.encode(prompt, add_special_tokens=False), slots)
+                report["slots"] = {"count": len(slots), **{slot.letter: slot.token_id for slot in slots[:2]}}
+            else:
+                slots = self.readout.slots(2)
+                prompt = self.readout.render({"health": "check"}, question)
+                self.readout.check_boundary(prompt, slots)
+                report["slots"] = {slot.letter: slot.token_id for slot in slots}
             report["boundary_check"] = "passed"
-            report["slots"] = {slot.letter: slot.token_id for slot in slots}
             report["ok"] = bool(report.get("model_listed", False)) and matched
         except (ReadoutError, QuestionError) as exc:
             report["boundary_check"] = f"failed: {exc}"
+        if probe:
+            try:
+                result = self.decide({"health": "check"}, {"probe": question}, calibrated=False)
+                answer = result.answers["probe"]
+                report["read_probe"] = f"passed ({answer.strategy}, {answer.requests} requests)"
+            except (ReadoutError, QuestionError) as exc:
+                report["read_probe"] = f"failed: {exc}"
+                report["ok"] = False
+            report["chat_system_render"] = self.readout.probe_chat_render({"health": "check"}, question)
         return report
 
     # -- the friendly call -------------------------------------------------
@@ -410,9 +500,11 @@ class DecisionModel:
         once, or a question object for full control.
 
         ``image`` attaches a local file, HTTP(S) URL, or image data URL.
-        Calibration defaults to enabled for direct text and disabled for images.
-        Wide text choices use uncalibrated finalist scores; explicit
-        ``calibrated=True`` is rejected for those heads.
+        Calibration defaults to enabled for direct text and disabled for images,
+        and is applied only where a fitted record covers the served checkpoint.
+        DE-1 wide text choices use uncalibrated finalist scores; explicit
+        ``calibrated=True`` is rejected for those heads. DE-2 reads text choices
+        up to 256 options in one prompt.
 
         Returns a `Decision`: ``result["intent"]`` is the chosen label, and
         ``result.answers["intent"]`` carries the distribution behind it.
@@ -450,7 +542,7 @@ class DecisionModel:
                 decision[head] = {"label": answer.label, "confidence": answer.confidence}
             else:
                 decision[head] = answer.label
-            if answer.strategy != "direct" and (include_probabilities or include_confidence):
+            if answer.score_semantics != "option-softmax" and (include_probabilities or include_confidence):
                 decision[head].update(strategy=answer.strategy, score_semantics=answer.score_semantics,
                                       calibrated=False)
         return decision
@@ -473,7 +565,7 @@ class DecisionModel:
         each answer's primary value; ``result.answers`` returns the full answer.
         ``image`` attaches a local file, HTTP(S) URL, or image data URL.
         Calibration defaults to enabled for direct text and disabled for images.
-        Wide text choices return uncalibrated finalist scores and reject
+        DE-1 wide text choices return uncalibrated finalist scores and reject
         explicit ``calibrated=True``.
         """
         parsed = {head: _question_from_head(head, spec)[0] for head, spec in questions.items()}
@@ -508,11 +600,17 @@ class DecisionModel:
             else:
                 work.append((head, question))
 
-        # Validate every head before issuing any requests. The raw readout's
-        # per-prompt validation remains capped at MAX_OPTIONS.
+        # Validate every head before issuing any requests.
         overflow_heads = set()
         for head, question in work:
-            if isinstance(question, Choice) and len(question.options()) > MAX_OPTIONS:
+            wide = isinstance(question, Choice) and len(question.options()) > MAX_OPTIONS
+            if self.family == "de2":
+                # DE-2 reads a text choice of up to MAX_CODES options in one prompt,
+                # so nothing overflows; the image path keeps the letter limit.
+                if wide and image_url is not None:
+                    raise QuestionError(f"head {head!r}: image choices above {MAX_OPTIONS} options are not supported")
+                question.validate(MAX_CODES if wide else MAX_OPTIONS)
+            elif wide:
                 if self.overflow == "error":
                     raise QuestionError(f"head {head!r}: overflow='error' rejects choices above {MAX_OPTIONS} options")
                 if image_url is not None:
@@ -524,17 +622,21 @@ class DecisionModel:
             else:
                 question.validate()
 
-        def run(item: tuple[str, Question]) -> tuple[str, Question, LetterRead | OverflowRead, list[tuple[str, Any]]]:
+        def run(item: tuple[str, Question]) -> tuple[str, Question, Any, list[tuple[str, Any]]]:
             head, question = item
             if head in overflow_heads:
                 return head, question, read_overflow(self.readout, state, question, debug=debug), question.options()
-            if image_url is None:
-                read, options = self.readout.evaluate(state, question, debug=debug)
-            else:
+            if image_url is not None:
                 read = self.readout.read_image(
                     state, question, image_url, top_logprobs=self.image_top_logprobs, debug=debug,
                 )
                 options = question.options()
+            elif self.family == "de2":
+                read = read_policy(self.readout, state, question, policy=self.policy,
+                                   think_gate=self.think_gate, think_budget=self.think_budget, debug=debug)
+                options = question.options()
+            else:
+                read, options = self.readout.evaluate(state, question, debug=debug)
             return head, question, read, options
 
         if self.max_workers > 1 and len(work) > 1:
@@ -546,7 +648,26 @@ class DecisionModel:
         input_tokens = 0
         requests = 0
         logical_reads = 0
+        thought_tokens = 0
         for head, question, read, options in results:
+            if isinstance(read, PolicyRead):
+                # A distribution read after a thought is not the read any record
+                # was fitted on, so it is returned raw.
+                answer = _answer_from_read(question, read.read, options, self.calibration,
+                                           calibrated and self.calibration_applied and read.thought is None)
+                answer.strategy = read.strategy
+                answer.stages = answer.logical_reads = read.logical_reads
+                answer.requests = read.requests
+                if read.thought is not None:
+                    answer.thought_tokens = read.thought_tokens
+                    answer.thought_closed = read.thought.closed
+                decision.answers[head] = answer
+                decision.raw[head] = {**read.raw(debug), "options": [key for key, _ in options]}
+                input_tokens += read.prompt_tokens
+                requests += read.requests
+                logical_reads += read.logical_reads
+                thought_tokens += read.thought_tokens
+                continue
             if isinstance(read, OverflowRead):
                 answer = Answer(type="choice", probabilities=read.probabilities,
                                 choice=max(read.probabilities, key=read.probabilities.get),
@@ -561,7 +682,8 @@ class DecisionModel:
                 logical_reads += read.logical_reads
                 continue
             logical_reads += 1
-            answer = _answer_from_read(question, read, options, self.calibration, calibrated)
+            answer = _answer_from_read(question, read, options, self.calibration,
+                                       calibrated and self.calibration_applied)
             decision.answers[head] = answer
             decision.raw[head] = {
                 "logprobs": read.logprobs,
@@ -578,27 +700,36 @@ class DecisionModel:
                 decision.raw[head]["top_logprobs"] = read.top_logprobs
                 if read.messages is not None:
                     decision.raw[head]["messages"] = read.messages
+            if read.system_render is not None:
+                decision.raw[head]["system_render"] = read.system_render
             input_tokens += read.prompt_tokens
             requests += read.requests
         decision.usage = {
             "input_tokens": input_tokens,
-            "output_tokens": logical_reads,
+            "output_tokens": logical_reads + thought_tokens,
             "logical_reads": logical_reads,
+            "thought_tokens": thought_tokens,
             "requests": requests,
             "wall_ms": round((time.perf_counter() - started) * 1000, 2),
         }
+        # What the answers carry, not what was asked for: a requested calibration
+        # that no fitted record covers leaves every answer raw.
+        flags = {answer.calibrated for answer in decision.answers.values()}
         decision.meta = {
             "model": self.model,
             "base_url": self.base_url,
-            "readout_version": READOUT_VERSION,
+            "family": self.family,
+            "readout_version": self.readout_version,
+            "policy": self.policy,
             "input_type": "image" if image_url is not None else "text",
             "calibration": self.calibration.id,
-            "calibrated": ((next(iter({a.calibrated for a in decision.answers.values()}))
-                            if len({a.calibrated for a in decision.answers.values()}) == 1 else None)
-                           if overflow_heads else calibrated),
+            "calibrated": next(iter(flags)) if len(flags) == 1 else (None if flags else calibrated),
             "calibration_by_head": {head: answer.calibrated for head, answer in decision.answers.items()},
             "strategy_by_head": {head: answer.strategy for head, answer in decision.answers.items()},
         }
+        if self.family == "de2":
+            decision.meta.update(think_gate=self.think_gate, think_budget=self.think_budget,
+                                 think_option_cap=THINK_OPTION_CAP)
         return decision
 
 
@@ -612,7 +743,7 @@ def _answer_from_read(
     """Turn one letter read into a typed answer, tempering if asked."""
     temperature = calibration.temperature_for(question.type) if calibrated else 1.0
     applied = calibrated and temperature != 1.0
-    letters = [LETTERS[index] for index in range(len(options))]
+    letters = codes_for(len(options))
     raw = {letter: read.probabilities[letter] for letter in letters}
 
     common: dict[str, Any] = {

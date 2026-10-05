@@ -20,6 +20,11 @@ Readout identity describes the answer-producing contract, not the client build.
 Implementation-only fixes do not change it. Client releases are identified
 separately by `shisa_de.__version__`.
 
+This page is the DE-1 contract. DE-2 is read through `de2-codebook-v1`, which
+keeps this scaffold and changes the read; [the DE-2 readout](READOUT-DE2.md)
+states the differences. The client picks the contract from the served model's
+family ([section 14](#14-families-and-readout-identities)).
+
 - Readout version: `de1-letter-slots-v3`
 - Maximum options per prompt: 26; text choices through `DecisionModel`: 676
 - Requests per direct prompt: 1, plus 1 per option letter outside the top-k;
@@ -400,6 +405,36 @@ probability does.
 is never mixed with tempered ones silently. Pass `calibrated=False` for raw
 logprob-derived probabilities.
 
+**When the record is applied.** A record names the checkpoint, the readout
+version and the serving shape it was fitted on. The client compares that with
+the served model and reports one of four levels (`Calibration.applicability`,
+`shisa-de doctor`):
+
+| Level | Meaning | Bundled record | Record passed as `calibration=` |
+| --- | --- | --- | --- |
+| `checkpoint` | Fitted on this checkpoint, against a readout this one reproduces | Applied | Applied |
+| `family` | Right family and readout, another checkpoint | Not applied; the client warns | Applied; `doctor` notes it |
+| `mismatch` | Another family, or a readout this one does not reproduce | Not applied | Applied; `doctor` fails |
+| `unfitted` | The record holds no temperature | Nothing to apply | Nothing to apply |
+
+The checkpoint is recognised by the served model id, or by the tokenizer source
+when a server aliases the id (`model="my-alias", tokenizer="shisa-ai/shisa-de-1"`).
+A record you pass yourself is your assertion and is applied as given. When no
+record is applied, answers are raw, `Answer.calibrated` is `False`, and
+`result.meta["calibrated"]` says what the answers carry, not what was requested.
+
+**Readout compatibility.** The bundled record was fitted against
+`de1-letter-slots-v1`. v2 added the image path and v3 added overflow
+orchestration; neither changed the direct text read, so the record still
+describes this client's direct text answers. `CALIBRATION_COMPATIBLE` in
+`shisa_de/readout.py` lists, for each current readout version, the earlier
+versions whose direct text read is answer-identical. A future version that
+changes that read must leave its predecessors out of the list, which fails
+every record fitted against them until it is re-fitted.
+
+`result.meta["calibration"]` is the record's identity,
+`model|readout_version|serving_shape[temperatures]`.
+
 The fit belongs to a serving shape, not to the checkpoint alone. The temperatures
 above were fitted on a local merged server; the hosted endpoint returns slightly
 different logprobs (the same card example that scores 0.9973 in the model card
@@ -472,7 +507,8 @@ def ask(state, criterion, options, api_key, base_url="https://api.shisa.ai/opena
 ## 11. Verification
 
 ```bash
-shisa-de doctor                        # endpoint, served model id, boundary check
+shisa-de doctor                        # endpoint, model id, family, boundary check, calibration
+shisa-de doctor --probe                # also one live read and the chat system render
 shisa-de explain --labels spam,ham     # every step of one readout, printed
 python -m pytest tests/                # offline: rendering, slots, fallback accounting
 SHISA_DE_LIVE=1 python -m pytest tests/test_live.py    # against a live endpoint
@@ -482,6 +518,13 @@ SHISA_DE_LIVE=1 python -m pytest tests/test_live.py    # against a live endpoint
 top logprobs with the answer slots marked, the normalized distribution, and the
 equivalent `curl`. It is the fastest way to confirm that a new endpoint behaves
 like the one described here.
+
+`doctor` exits non-zero when the model id is not served, the boundary check
+fails, or the calibration record is a `mismatch` for the served model. It prints
+the family and where that came from, the readout version, and the calibration
+level. `--probe` spends two requests: one question through the read, and one
+text-only chat request that reports how the server renders the system turn
+([section 12](#12-image-readout)).
 
 A deployment matches this page when: `/v1/models` lists the model id, the
 boundary check passes, one question returns one letter, and the reported
@@ -557,6 +600,26 @@ Missing letters cause `ReadoutError`; raise the server's logprob limit and
 `image_top_logprobs` or reduce the option set. Never normalize an incomplete
 option distribution.
 
+**The system turn on this path.** The server renders the prompt, and it does not
+render the system turn the way the text scaffold does. vLLM hands Gemma 4's chat
+template every message of an image request as content parts, and the template
+writes a space after a system message that arrives that way, so the image prompt
+has one token the text prompt lacks, between the system line and `<turn|>`.
+Observed on hosted `shisa-ai/shisa-de-1` at `vllm-0.26.0-tp2-ae644bcc` and on a
+local vLLM 0.30.0 at `vllm-0.30.0-709530de`, both on 2026-10-06. This is the
+image path as it has always been served, and image answers come from it; whether
+the space changes them has not been measured. The boundary check above still
+passes, because it looks at the last prompt token.
+
+Each image read records what it saw in `result.raw[head]["system_render"]`:
+`string` when the system turn matches the text scaffold, `differs` when it does
+not, `unverified` when the response does not carry enough prompt tokens to tell.
+`Readout.read_image(..., require_string_system=True)` turns anything but
+`string` into an error. `DecisionModel` does not set it: vLLM 0.30.0 served with
+`--chat-template-content-format string` rejects every image request with HTTP
+500 ("Failed to apply prompt replacement"), so on a stock server the strict form
+has nothing to accept.
+
 Each successful image question costs one request. Input usage includes image
 tokens reported by the server. `result.meta["input_type"]` distinguishes
 `"image"` from `"text"`, and `readout_version` is `de1-letter-slots-v3` for both.
@@ -568,6 +631,9 @@ that it has been fitted for images. With `debug=True`, image requests expose
 the image URL or embedded image bytes.
 
 ## 13. Text choice overflow
+
+This section is DE-1 only. DE-2 reads a text choice of up to 256 options in one
+prompt and never overflows ([the DE-2 readout](READOUT-DE2.md#9-wide-choices-against-de-1s-overflow)).
 
 `DecisionModel(overflow="finalist-top1")` is the default. Text `Choice` and
 single-label `classify` heads with 27–676 options use this two-stage rule:
@@ -643,3 +709,31 @@ it. Source: research repository `research-jev-universal-classifiers`, commit
 `ef18e24`, `evals/reports/DE1-OVERFLOW.md` and its retained artifacts.
 `tests/fixtures/overflow-replay.json` records five component-distribution cases
 from that held-out run; offline tests reproduce their choices and score maps.
+
+## 14. Families and readout identities
+
+Two contracts are current, one per model family, and both are named in
+`shisa_de/readout.py` (`READOUT_VERSIONS`):
+
+| Family | Readout version | Contract |
+| --- | --- | --- |
+| `de1` | `de1-letter-slots-v3` | This page |
+| `de2` | `de2-codebook-v1` | [The DE-2 readout](READOUT-DE2.md) |
+
+The family decides the readout version, the read policy, the option limit, and
+which calibration record is considered. It is resolved once, when the client is
+built, in this order:
+
+1. `DecisionModel(family="de1")`, or `--family` on the command line.
+2. A slug in the served model id: `shisa-ai/shisa-de-1`, `de1-...`, `de2-...`.
+3. A slug in the tokenizer source, for a server that aliases the model id.
+4. Otherwise `de2`, as an assumption. The client warns, and `doctor` prints
+   `family de2 (assumed)`.
+
+An id that names both families names neither. `result.meta["family"]` and
+`result.meta["readout_version"]` record which contract produced an answer.
+
+Reading a checkpoint through the other family's contract is not an error the
+client can detect: a DE-1 checkpoint read as DE-2 would have its questions
+repeated and, when unsure, thought about, neither of which was measured for it.
+Declare the family whenever the model id does not.

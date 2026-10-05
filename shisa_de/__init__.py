@@ -8,9 +8,10 @@
 The readout contract, with full samples, is in `docs/READOUT.md`. The model is
 served rather than loaded, so nothing here downloads weights.
 
-DE-1 and DE-2 share the letter-slot readout but not a calibration. The client
-picks the record from the served model id: an id with an explicit DE-1 slug is
-DE-1, anything else is treated as DE-2. Pass `calibration=` to override.
+DE-1 and DE-2 are read through different contracts (`docs/READOUT-DE2.md` for
+what DE-2 changes). The client picks the contract from the served model id, then
+the tokenizer source, and otherwise assumes DE-2 with a warning; pass `family=`
+to declare it.
 """
 
 from .calibration import (
@@ -26,10 +27,24 @@ from .calibration import (
     temper_distribution,
 )
 from .client import DEFAULT_ENDPOINT, DEFAULT_MODEL, Answer, Decision, DecisionModel
-from .family import DEFAULT_FAMILY, FAMILIES, family_is_explicit, model_family
+from .family import DEFAULT_FAMILY, FAMILIES, family_is_explicit, model_family, resolve_family
 from .images import ImageError
+from .policy import POLICIES, THINK_BUDGET, THINK_GATE, THINK_OPTION_CAP, PolicyRead, read_policy
 from .questions import MAX_OPTIONS, Choice, Noul, Question, QuestionError, Score
-from .readout import DIRECT_SYSTEM, LETTERS, READOUT_VERSION, LetterRead, Readout, ReadoutError, Slot, softmax
+from .readout import (
+    DE2_READOUT_VERSION,
+    DIRECT_SYSTEM,
+    LETTERS,
+    MAX_CODES,
+    READOUT_VERSION,
+    READOUT_VERSIONS,
+    LetterRead,
+    Readout,
+    ReadoutError,
+    Slot,
+    codes_for,
+    softmax,
+)
 
 __version__ = "0.3.0"
 
@@ -41,6 +56,7 @@ __all__ = [
     "DEFAULT_ENDPOINT",
     "DEFAULT_FAMILY",
     "DEFAULT_MODEL",
+    "DE2_READOUT_VERSION",
     "DIRECT_SYSTEM",
     "Decision",
     "DecisionModel",
@@ -48,23 +64,33 @@ __all__ = [
     "ImageError",
     "LETTERS",
     "LetterRead",
+    "MAX_CODES",
     "MAX_OPTIONS",
+    "POLICIES",
+    "PolicyRead",
     "Noul",
     "Question",
     "QuestionError",
     "READOUT_VERSION",
+    "READOUT_VERSIONS",
     "Readout",
     "ReadoutError",
     "Score",
     "Slot",
+    "THINK_BUDGET",
+    "THINK_GATE",
+    "THINK_OPTION_CAP",
     "__version__",
     "calibration_for",
     "calibration_from_dict",
+    "codes_for",
     "confidence",
     "family_is_explicit",
     "load_calibration",
     "load_calibration_file",
     "model_family",
+    "read_policy",
+    "resolve_family",
     "resolve_calibration",
     "softmax",
     "temper_binary",

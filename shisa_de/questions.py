@@ -1,8 +1,9 @@
-"""Question objects: the three System One primitives, in DE-1's terms.
+"""Question objects: the three System One primitives, in DE terms.
 
 Each object serializes to the wire shape the TypeSafe API documents, so the same
-question can be sent to hosted Jev or to a DE-1 endpoint. See
-``docs/READOUT.md`` for how each one is rendered and read.
+question can be sent to hosted Jev or to a DE-1 or DE-2 endpoint. See
+``docs/READOUT.md`` and ``docs/READOUT-DE2.md`` for how each one is rendered and
+read.
 
     >>> Choice("Which queue?", {"billing": "Charges and refunds"}).to_wire()
     {'type': 'choice', 'instructions': 'Which queue?', 'criteria': {'billing': 'Charges and refunds'}}
@@ -15,9 +16,11 @@ from typing import Any
 
 QUESTION_TYPES = ("noul", "choice", "score")
 
-#: DE-1 reads one answer letter per question, so a question can offer at most
-#: this many options or levels. TypeSafe's hosted API allows 255 options and 10
-#: levels; the readout is the binding limit here.
+#: The letter-slot limit: one answer letter per option, so at most this many
+#: options or levels in one prompt. It binds every DE-1 prompt, and every DE-2
+#: noul, score and image question; DE-2 text choices go up to the 256-code
+#: codebook (`shisa_de.readout.MAX_CODES`). TypeSafe's hosted API allows 255
+#: options and 10 levels.
 MAX_OPTIONS = 26
 
 
@@ -42,17 +45,22 @@ class Question:
         """
         raise NotImplementedError
 
-    def validate(self) -> None:
+    def validate(self, max_options: int = MAX_OPTIONS) -> None:
+        """Reject a question the readout cannot render.
+
+        `max_options` is the per-prompt limit of the contract in use: 26 letters
+        by default, the 256-code codebook when DE-2 reads a text choice.
+        """
         if not self.instructions or not str(self.instructions).strip():
             raise QuestionError("instructions must be a non-empty question")
         count = len(self.options())
         if count < 2:
             raise QuestionError(f"{self.type} question needs at least two answers, got {count}")
-        if count > MAX_OPTIONS:
+        if count > max_options:
             raise QuestionError(
-                f"{self.type} question offers {count} answers; DE-1 reads one letter per "
-                f"answer and supports at most {MAX_OPTIONS} per prompt. "
-                "Use DecisionModel for text choice overflow."
+                f"{self.type} question offers {count} answers; the readout binds one code per "
+                f"answer and supports at most {max_options} per prompt here. "
+                "Use DecisionModel for wide text choices."
             )
 
 
