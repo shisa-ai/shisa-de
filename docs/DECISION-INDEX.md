@@ -422,9 +422,15 @@ not a project requirement. The owner is correcting the card. This document's
 initial revision repeated that statement as a submission concern; that was an
 error. Do not treat it as an admission rule or an eligibility blocker.
 
-The checkpoint was private when downloaded. Public submission still requires
-arranging model access for maintainers and owner approval to publish; those are
-separate from the retracted review claim.
+The training mix is proprietary and will not be published. The reviewed
+Decision Index submission instructions do not require publishing training data.
+Internal data-governance rules, whether real or incorrectly asserted, are not
+leaderboard eligibility requirements. Evaluation-data licence restrictions and
+reproducible inference are separate concerns.
+
+The checkpoint was private when downloaded. Arrange whatever model or endpoint
+access the maintainers need for verification; this does not imply access to the
+training mix. Publishing local artifacts requires the owner's approval.
 
 ### Prior policy tuning on benchmark samples
 
