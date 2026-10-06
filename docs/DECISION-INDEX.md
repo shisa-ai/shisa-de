@@ -413,20 +413,18 @@ maintainers decide. Changing the noul rendering would require a readout-version
 bump because it changes prompts; it is not necessary merely to reproduce the
 existing model contract.
 
-### Training-pool provenance
+### Correction to the RC card's training-pool claim
 
-**Local** fact: the release-candidate model card
-(`shisa-ai/shisa-de-2-rc-v7s13`, snapshot
-`cf090e1ddbdf8a2370057fa74154728e1a0bddf0/README.md`) states the training pool
-"not admitted for training by the project's own review
-rules; several families are single-author and unreviewed." It also labels the repository a
-private release candidate, "not a release."
+On 2026-10-06, the model owner clarified that the multiple-review training-pool
+requirement stated in the RC card at snapshot
+`cf090e1ddbdf8a2370057fa74154728e1a0bddf0` was invented by the submitting agent,
+not a project requirement. The owner is correcting the card. This document's
+initial revision repeated that statement as a submission concern; that was an
+error. Do not treat it as an admission rule or an eligibility blocker.
 
-Risk: a public leaderboard entry would present a model whose training data the
-project's own review did not admit. This is independent of the run and cannot be
-fixed by how the run is scored. Decide whether the model is eligible to be
-public before opening a pull request; if it stays private, check whether the
-board accepts a private checkpoint with a results dataset link.
+The checkpoint was private when downloaded. Public submission still requires
+arranging model access for maintainers and owner approval to publish; those are
+separate from the retracted review claim.
 
 ### Prior policy tuning on benchmark samples
 
@@ -500,9 +498,8 @@ either way.
    `payload`, no `raw_output`) is accepted for the review re-scoring and the
    held-out answer comparison. The checks appear to need only `response`, but
    the README does not say so.
-5. **Private model, public board.** Whether the board accepts an entry whose
-   model is a private release candidate whose training pool was not admitted
-   under the project's review rules.
+5. **Model access.** If the checkpoint remains private, arrange maintainer
+   access for independent answer and latency verification.
 6. **Overflow fallback.** Whether the DE-2 policy's capacity fallback (read
    twice → single read, or keep the read-twice answer) is acceptable to the
    board, or whether every over-limit prompt must be refused as `Unsupported`.
