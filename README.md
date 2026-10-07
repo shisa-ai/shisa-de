@@ -9,8 +9,9 @@ client loads only a tokenizer; model weights stay on the server.
 
 - **DE-1** is available on the hosted [Shisa Platform](https://platform.shisa.ai/)
   or from your own OpenAI-compatible server.
-- **DE-2** is not hosted or released yet. The client can read a DE-2 checkpoint
-  you serve yourself; see [Use DE-2](#use-de-2).
+- **DE-2** is [`shisa-ai/shisa-de-2`](https://huggingface.co/shisa-ai/shisa-de-2)
+  on Hugging Face, served from your own OpenAI-compatible server; see
+  [Use DE-2](#use-de-2).
 
 ## Benchmark snapshot
 
@@ -324,7 +325,8 @@ environment are sent to local endpoints too.
 
 ## Use DE-2
 
-The same `classify` and `decide` calls work against a DE-2 checkpoint you serve.
+The same `classify` and `decide` calls work against DE-2. Serve it with
+`vllm serve shisa-ai/shisa-de-2` and point the client at it.
 The client asks DE-2 differently from DE-1, the way DE-2 was built to be asked:
 
 - **Each question is shown to the model twice** in one prompt.
@@ -341,10 +343,8 @@ The client asks DE-2 differently from DE-1, the way DE-2 was built to be asked:
 from shisa_de import Choice, DecisionModel
 
 with DecisionModel.from_endpoint(
-    "http://127.0.0.1:8021/v1",
-    model="my-checkpoint",                    # the id your server uses
-    family="de2",
-    tokenizer="google/gemma-4-26B-A4B-it",
+    "http://127.0.0.1:8000/v1",
+    model="shisa-ai/shisa-de-2",
     api_key="",
 ) as de:
     result = de.decide("Route this support request", {
@@ -359,8 +359,11 @@ with DecisionModel.from_endpoint(
 ```
 
 ```bash
-shisa-de doctor --model my-checkpoint --family de2 --tokenizer google/gemma-4-26B-A4B-it --probe
+shisa-de doctor --base-url http://127.0.0.1:8000/v1 --model shisa-ai/shisa-de-2 --probe
 ```
+
+For your own DE-2 checkpoint under another name, pass `model=` as your server
+names it, `family="de2"`, and `tokenizer="google/gemma-4-26B-A4B-it"`.
 
 **Say which family the model is.** DE-1 and DE-2 are asked differently, so a
 model read as the wrong family returns answers nobody has measured. The client
@@ -375,8 +378,9 @@ Choices above 128 options cost one extra request.
 **Serving DE-2 with vLLM:**
 
 - The default `--max-logprobs` is enough at every label-set size.
-- Use `--attention-backend TRITON_ATTN` on vLLM 0.30.0. The DE-2 research notes
-  report that the default attention backend lowers Gemma 4's accuracy.
+- No special options are needed on most GPUs. On Hopper GPUs (H100, H200, H20)
+  with vLLM 0.30.0, pass `--attention-backend TRITON_ATTN`: the model card
+  reports that the default backend lowers accuracy there.
 - Do not serve a chat template that repeats the input itself; this client
   already does.
 - Leave `--chat-template-content-format` at its default if you use images.
@@ -432,8 +436,8 @@ reads it the DE-2 way: shown twice, with a thinking step when unsure.
 DecisionModel(model="shisa-ai/shisa-de-1", family="de2")
 ```
 
-DE-1 was not trained to be read this way, and the result has not been measured
-or calibrated: probabilities are raw, and answers are recorded as `family: de2`.
+DE-1 was not trained to be read this way and no calibration has been fitted for
+it: probabilities are raw, and answers are recorded as `family: de2`.
 The server must also support the [DE-2 requests](docs/READOUT-DE2.md). A DE-2
 model is the recommended way to get this policy.
 

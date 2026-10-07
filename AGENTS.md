@@ -146,8 +146,8 @@ contract skip on the other, so run it against both before changing shared code.
 - The research repository's numbers are its own, not this repo's. Cite them
   with their source and say they were not reproduced here, as
   `docs/READOUT-DE2.md` does for the policy's accuracy.
-- No DE-2 checkpoint is hosted or released. DE-2 numbers here come from a
-  candidate adapter on a local server; say so wherever one appears.
+- DE-2 numbers here come from a local server, some from a candidate adapter
+  and some from `shisa-ai/shisa-de-2`; say which wherever one appears.
 - The model card's published numbers are the card's, not this repo's. When a
   card value and a local measurement disagree, report both and say which is
   which (the card's spam example scores 0.9973 there and 0.999351 on the hosted

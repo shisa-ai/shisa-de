@@ -16,9 +16,10 @@ softmax, and how letters become typed answers.
 Measured numbers on this page, unless a line says otherwise, come from the LoRA
 adapter `de2-v4-lr5e5-e3-s7` on `google/gemma-4-26B-A4B-it` (snapshot
 `4d7ae4984b7d`), served by vLLM 0.30.0 on one GPU in bf16 with the Triton
-attention backend, fingerprint `vllm-0.30.0-709530de`, on 2026-10-06. No DE-2
-checkpoint is hosted or released yet, so these describe a candidate on a local
-server. Re-measure on the endpoint you deploy against.
+attention backend, fingerprint `vllm-0.30.0-709530de`, on 2026-10-06. They
+describe that candidate on a local server, not the released
+`shisa-ai/shisa-de-2`; the calibration in section 7 is the exception.
+Re-measure on the endpoint you deploy against.
 
 ## What changes from DE-1
 
