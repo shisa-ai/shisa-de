@@ -421,6 +421,18 @@ it actually thought.
 DE-1 has one read, so there is nothing to trade: `compound=False` only makes
 choices above 26 options an error instead of a two-round read.
 
+**The adaptive policy on a DE-1 checkpoint.** Declaring a DE-1 model as DE-2
+reads it the DE-2 way: shown twice, with a thinking step when unsure.
+
+```python
+DecisionModel(model="shisa-ai/shisa-de-1", family="de2")
+```
+
+DE-1 was not trained to be read this way, and the result has not been measured
+or calibrated: probabilities are raw, and answers are recorded as `family: de2`.
+The server must also support the [DE-2 requests](docs/READOUT-DE2.md). A DE-2
+model is the recommended way to get this policy.
+
 Things to know:
 
 - `reasoning=True` always shows the question twice first, and `reads="single"`
