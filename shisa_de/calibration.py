@@ -17,7 +17,8 @@ another.
 
 A record is applied on its own only to the checkpoint it was fitted on, read
 through a readout its fit still describes (`Calibration.applicability`). The
-DE-2 record is unfitted, so DE-2 answers are raw until someone fits one.
+DE-2 record holds one fit per read, because the single read, the repeated read
+and the read after a thought are differently overconfident.
 """
 
 from __future__ import annotations
@@ -88,11 +89,16 @@ class Calibration:
     note: str = ""
     #: A fit that was made and deliberately not shipped, kept for its provenance.
     withheld: dict[str, Any] = field(default_factory=dict)
+    #: Temperatures per read, for a family whose answers come from more than one
+    #: (`direct`, `repeat2`, `think` for DE-2). When present, a read it does not
+    #: name is left raw; `temperatures` is then the default read's, for reference.
+    reads: dict[str, dict[str, float]] = field(default_factory=dict)
 
     @property
     def fitted(self) -> bool:
         """Whether the record changes any probability. An unfitted record is all 1.0."""
-        return any(float(value) != 1.0 for value in self.temperatures.values())
+        tables = [self.temperatures, *self.reads.values()]
+        return any(float(value) != 1.0 for table in tables for value in table.values())
 
     @property
     def id(self) -> str:
@@ -105,12 +111,24 @@ class Calibration:
         it. A reader of one answer can now tell which checkpoint the number
         beside it was fitted on.
         """
-        parts = ",".join(f"{key}={value}" for key, value in sorted(self.temperatures.items()))
+        def table(temperatures: dict[str, float]) -> str:
+            return ",".join(f"{key}={value}" for key, value in sorted(temperatures.items()))
+
+        parts = table(self.temperatures)
+        if self.reads:
+            parts = ";".join(f"{read}:{table(values)}" for read, values in sorted(self.reads.items()))
         return f"{self.model}|{self.readout_version}|{self.serving_shape}[{parts}]"
 
-    def temperature_for(self, question_type: str) -> float:
-        """The temperature for a question type. Score distributions use the choice fit."""
+    def temperature_for(self, question_type: str, read: str | None = None) -> float:
+        """The temperature for a question type. Score distributions use the choice fit.
+
+        `read` names the read the distribution came from. A record with per-read
+        temperatures applies only the entry for that read, and 1.0 to a read it
+        has no fit for; a record without them has one fit, for the direct read.
+        """
         key = "noul" if question_type == "noul" else "choice"
+        if self.reads:
+            return float(self.reads.get(read or "", {}).get(key, 1.0))
         return float(self.temperatures.get(key, 1.0))
 
     def applicability(self, model: str, readout_version: str, *, family: str | None = None,
@@ -187,6 +205,7 @@ def calibration_from_dict(raw: dict[str, Any], origin: str = "") -> Calibration:
         family=raw.get("family") or model_family(model),
         note=raw.get("note", ""),
         withheld=dict(raw.get("withheld") or {}),
+        reads={name: dict(values) for name, values in (raw.get("reads") or {}).items()},
     )
 
 

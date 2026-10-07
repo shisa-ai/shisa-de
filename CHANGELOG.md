@@ -2,8 +2,21 @@
 
 ## 0.4.0
 
-Read settings by part, per model and per call. No answer changes: both readout
-versions are unchanged, and every setting selects a read 0.3.0 already had.
+Read settings by part, per model and per call, and a first DE-2 calibration.
+Both readout versions are unchanged: every setting selects a read 0.3.0 already
+had, and DE-2's raw distributions and chosen options are the same.
+
+- Calibrate `shisa-ai/shisa-de-2` by default. The DE-2 record now holds
+  temperatures per read (`direct`, `repeat2`, `think`), fitted on 2026-10-08, and
+  the client applies each only to the read it was fitted on, including answers
+  read after a thought. **DE-2 probabilities and confidences on that model are
+  lower than in 0.3.0**; pass `calibrated=False` for the raw ones. Other DE-2
+  checkpoints stay raw, with a warning.
+- Calibration records may carry a `reads` table;
+  `Calibration.temperature_for(type, read)` reads it. Records without one behave
+  as before.
+- Add `scripts/calibrate_de2_collect.py` and `scripts/calibrate_de2_fit.py`, the
+  collection and fit behind the record.
 
 - Add `reads` (`"single"` / `"double"`), `reasoning`, `reasoning_prob`,
   `reasoning_len` and `compound` to `DecisionModel`. `policy`, `think_gate`,

@@ -1,23 +1,131 @@
 {
   "temperatures": {
-    "noul": 1.0,
-    "choice": 1.0
+    "noul": 2.76,
+    "choice": 1.89
+  },
+  "reads": {
+    "direct": {
+      "noul": 2.69,
+      "choice": 1.81
+    },
+    "repeat2": {
+      "noul": 2.76,
+      "choice": 1.89
+    },
+    "think": {
+      "noul": 6.8,
+      "choice": 6.8
+    }
   },
   "readout_version": "de2-codebook-v1",
-  "model": "none",
-  "serving_shape": "unfitted",
+  "model": "shisa-ai/shisa-de-2",
+  "serving_shape": "vllm-0.30.0-merged-bf16-triton-tp1",
   "family": "de2",
-  "fitted_on": "Nothing. No temperature has been fitted for the de2-codebook-v1 readout, so DE-2 answers are raw option-softmax probabilities.",
-  "test_ece": {},
-  "source": "",
+  "fitted_on": "2026-10-08, shisa-ai/shisa-de-2 (Hub snapshot 16648787b175) on a local vLLM 0.30.0 server: merged BF16, TRITON_ATTN, one RTX PRO 6000, max_model_len 262144, 64 concurrent requests, read through this client at de2-codebook-v1. 9,931 questions from 53 suites of research-jev-universal-classifiers evals/suites (regression, shisa, w9, diagnostics; reversed-order copies excluded; 8,321 English, 1,608 Japanese, 2 mixed), the first 10 minutes of a seeded shuffle of 18,513. Each question was read once (`direct`) and twice (`repeat2`); the 529 below the 0.7 gate with at most 26 options were sent through the thinking read, and 475 thought (54 read at or above the gate on the second pass). Fit: weighted NLL grid 0.5-32.0 step 0.01, every suite given equal weight, noul and choice separately, score distributions under the choice fit. `direct` and `repeat2` were fitted on one half of the groups and measured on the other. `think` is one temperature for both types fitted on all 475 rows (430 choice, 45 noul), measured by 5-fold cross-validation. `temperatures` repeats the `repeat2` entry; `reads` is what the client applies.",
+  "test_ece": {
+    "split": "held-out half of the groups; 5-fold cross-validation for think",
+    "direct_noul": {
+      "temperature": 2.69,
+      "fit_n": 1791,
+      "test_n": 1895,
+      "test_suites": 40,
+      "accuracy": 0.9241,
+      "confidence_before": 0.9733,
+      "confidence_after": 0.9095,
+      "ece_before": 0.0587,
+      "ece_after": 0.0322
+    },
+    "direct_choice": {
+      "temperature": 1.81,
+      "fit_n": 3105,
+      "test_n": 3140,
+      "test_suites": 34,
+      "accuracy": 0.8003,
+      "confidence_before": 0.9201,
+      "confidence_after": 0.8426,
+      "ece_before": 0.1205,
+      "ece_after": 0.0703
+    },
+    "repeat2_noul": {
+      "temperature": 2.76,
+      "fit_n": 1791,
+      "test_n": 1895,
+      "test_suites": 40,
+      "accuracy": 0.9242,
+      "confidence_before": 0.9818,
+      "confidence_after": 0.9193,
+      "ece_before": 0.0585,
+      "ece_after": 0.0227
+    },
+    "repeat2_choice": {
+      "temperature": 1.89,
+      "fit_n": 3105,
+      "test_n": 3140,
+      "test_suites": 34,
+      "accuracy": 0.8205,
+      "confidence_before": 0.9306,
+      "confidence_after": 0.8495,
+      "ece_before": 0.1104,
+      "ece_after": 0.0478
+    },
+    "repeat2_above_gate_noul": {
+      "temperature": 2.73,
+      "fit_n": 1753,
+      "test_n": 1865,
+      "test_suites": 40,
+      "accuracy": 0.9278,
+      "confidence_before": 0.985,
+      "confidence_after": 0.9237,
+      "ece_before": 0.0573,
+      "ece_after": 0.0211
+    },
+    "repeat2_above_gate_choice": {
+      "temperature": 1.88,
+      "fit_n": 2887,
+      "test_n": 2897,
+      "test_suites": 34,
+      "accuracy": 0.8457,
+      "confidence_before": 0.9593,
+      "confidence_after": 0.8769,
+      "ece_before": 0.1136,
+      "ece_after": 0.0456
+    },
+    "think": {
+      "temperature": 6.8,
+      "n": 475,
+      "suites": 27,
+      "accuracy": 0.5176,
+      "confidence_before": 0.9231,
+      "confidence_after": 0.5508,
+      "ece_before": 0.4113,
+      "ece_after": 0.1838,
+      "thoughts_cut_by_the_budget": 383
+    },
+    "adaptive_policy_output": {
+      "n": 5011,
+      "suites": 52,
+      "accuracy": 0.8813,
+      "ece_before": 0.091,
+      "ece_after": 0.0205,
+      "ece_with_thoughts_left_raw": 0.0279
+    }
+  },
+  "source": "scripts/calibrate_de2_collect.py and scripts/calibrate_de2_fit.py in this repository; rows and the fit report kept outside it at /data/de2/calibration-shisa-de-2-20261008 (reads.jsonl sha256 5eafe0073f36ca19..., thoughts.jsonl sha256 59a98bc1b0734d04...)",
+  "note": "A first, rough fit. Known limits: the suites are evaluation suites whose overlap with the training pool was not checked, which would bias the temperatures low; no image questions; 84% English; one serving shape; the think fit rests on 475 rows, 383 of them cut by the 1,024-token budget, and still leaves a cross-validated ECE of 0.18. Questions above the gate fit at 2.73 (noul) and 1.88 (choice), so they share the repeat2 entry. The gate reads raw probabilities and is unaffected. Re-fit before relying on these numbers for a threshold on another serving shape.",
   "withheld": {
     "model": "de2-v4-lr5e5-e3-s7",
     "readout": "one-pass scaffold (the de1-letter-slots-v3 direct read), not the de2-codebook-v1 repeated read",
     "serving_shape": "transformers-bf16-single-gpu",
     "fitted_on": "DE-2 calibration partition (de2_partitions_v11), 576 questions: 490 noul, 42 choice, 44 score. NLL grid 0.5-32.0 step 0.01. In-sample, no held-out half.",
-    "noul": {"nll_optimum": 1.36, "ece_before": 0.0233, "ece_after": 0.0263},
-    "choice": {"nll_optimum": "pinned to the grid floor 0.5", "ece_before": 0.0255},
+    "noul": {
+      "nll_optimum": 1.36,
+      "ece_before": 0.0233,
+      "ece_after": 0.0263
+    },
+    "choice": {
+      "nll_optimum": "pinned to the grid floor 0.5",
+      "ece_before": 0.0255
+    },
     "source": "research-jev-universal-classifiers scripts/fit_de2_calibration.py; report evals/reports/de2-temperature-fit.json"
-  },
-  "note": "Unfitted on purpose. The one fit attempted so far is recorded under `withheld` and is not applied: it was made on the one-pass scaffold rather than the repeated read this readout answers from, in-sample on 192 Japanese rows where the checkpoint is at ceiling, through Transformers rather than a served endpoint; its noul optimum made in-sample ECE worse and its choice optimum was degenerate. Fit on the de2-codebook-v1 readout, on the serving shape, with a held-out split, and pass the record as calibration=."
+  }
 }

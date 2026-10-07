@@ -221,12 +221,14 @@ calibrated in `answer.calibrated` and `answer.temperature`.
 | --- | --- |
 | DE-1 text | Calibrated by default; pass `calibrated=False` for raw |
 | Images | Raw |
-| DE-2 | Raw; no calibration has been fitted for DE-2 yet |
+| DE-2 text | Calibrated by default, with a separate fit for each read; pass `calibrated=False` for raw |
 | DE-1 large label sets | Finalist scores, never calibrated |
 
-The bundled DE-1 calibration was fitted on `shisa-ai/shisa-de-1`, and the client
-applies it only to that model. A different DE-1 checkpoint gets raw
-probabilities and a warning. To use a calibration you fitted yourself, or to
+Each bundled calibration is applied only to the model it was fitted on:
+`shisa-ai/shisa-de-1` and `shisa-ai/shisa-de-2`. Any other checkpoint gets raw
+probabilities and a warning. The DE-2 fit is a first, rough one; probabilities
+read after a thinking step are the least reliable
+([details](docs/READOUT-DE2.md#7-calibration)). To use a calibration you fitted yourself, or to
 vouch for the bundled one on another checkpoint, pass it in:
 
 ```python
@@ -331,7 +333,9 @@ The client asks DE-2 differently from DE-1, the way DE-2 was built to be asked:
   tokens and then answers again.
 - **Text choices go up to 256 options** in one question, with a full probability
   distribution and a confidence.
-- **Probabilities are raw.** No calibration has been fitted for DE-2.
+- **Probabilities are calibrated per read** on `shisa-ai/shisa-de-2`: answers
+  read once, twice, and after thinking each get their own fit. Other DE-2
+  checkpoints get raw probabilities.
 
 ```python
 from shisa_de import Choice, DecisionModel

@@ -23,6 +23,7 @@ import pytest
 from shisa_de import Choice, DecisionModel, Noul, Readout, ReadoutError, Score, softmax
 from shisa_de.calibration import (
     CALIBRATION_FILES,
+    Calibration,
     calibration_for,
     confidence,
     load_calibration,
@@ -1147,7 +1148,8 @@ def test_an_assumed_family_warns_and_a_declared_one_does_not(recwarn):
     recwarn.clear()
     declared = DecisionModel(model="my-arm", family="de2")
     assert (declared.family, declared.family_source) == ("de2", "declared")
-    assert not recwarn.list
+    # Declaring the family settles the family; the calibration warning is separate.
+    assert not [w for w in recwarn.list if "names neither" in str(w.message)]
     with pytest.raises(ValueError, match="unknown family"):
         DecisionModel(model="my-arm", family="de3")
 
@@ -1189,13 +1191,22 @@ def test_every_shipped_record_loads_and_applies_to_its_own_family():
         assert level in {"checkpoint", "unfitted"} and reasons == [], name
 
 
-def test_the_de2_record_is_unfitted_and_keeps_the_withheld_fit_as_provenance():
+def test_the_de2_record_holds_one_fit_per_read_and_keeps_the_withheld_fit():
     record = calibration_for("de2")
-    assert record.fitted is False
-    assert record.temperatures == {"noul": 1.0, "choice": 1.0}
+    assert record.fitted is True and record.model == "shisa-ai/shisa-de-2"
+    assert set(record.reads) == {"direct", "repeat2", "think"}
+    assert record.temperatures == record.reads["repeat2"]
+    assert record.temperature_for("noul", "direct") == record.reads["direct"]["noul"]
+    assert record.temperature_for("score", "repeat2") == record.reads["repeat2"]["choice"]
+    assert record.temperature_for("choice", "think") == record.reads["think"]["choice"]
+    # A read the record has no fit for is left raw.
+    assert record.temperature_for("choice", "image") == 1.0 and record.temperature_for("choice") == 1.0
+    assert all(f"{read}:" in record.id for read in record.reads)
     assert record.readout_version == DE2_READOUT_VERSION
     assert record.withheld["noul"]["nll_optimum"] == 1.36
-    assert calibration_for("de1").fitted is True
+    de1 = calibration_for("de1")
+    assert de1.fitted is True and not de1.reads
+    assert de1.temperature_for("noul", "direct") == de1.temperature_for("noul") == de1.temperatures["noul"]
 
 
 def test_a_record_applies_to_its_checkpoint_and_says_why_otherwise():
@@ -1215,8 +1226,9 @@ def test_a_record_applies_to_its_checkpoint_and_says_why_otherwise():
     ok, reasons = record.matches("shisa-ai/shisa-de-1", "some-other-readout")
     assert not ok and any("readout" in reason for reason in reasons)
     assert record.matches("de1-cont-v1-lr2e5-s7", READOUT_VERSION) == (True, [])
-    # Nothing fitted, so nothing to mismatch on: any DE-2 checkpoint may carry it.
-    assert calibration_for("de2").applicability("any-arm", DE2_READOUT_VERSION, family="de2") == ("unfitted", [])
+    de2 = calibration_for("de2")
+    assert de2.applicability("shisa-ai/shisa-de-2", DE2_READOUT_VERSION) == ("checkpoint", [])
+    assert de2.applicability("any-arm", DE2_READOUT_VERSION, family="de2")[0] == "family"
 
 
 def test_the_bundled_record_is_applied_only_to_the_checkpoint_it_was_fitted_on():
@@ -1304,7 +1316,7 @@ def test_health_passes_for_de2_and_checks_every_code():
         report = model.health()
     assert (report["model_family"], report["family_source"]) == ("de2", "model id")
     assert (report["readout_version"], report["policy"]) == (DE2_READOUT_VERSION, "repeat-think")
-    assert (report["calibration_level"], report["calibration_applied"]) == ("unfitted", False)
+    assert (report["calibration_level"], report["calibration_applied"]) == ("family", False)
     assert report["slots"]["count"] == MAX_CODES
     assert report["calibration_match"] is True and report["ok"] is True
 
@@ -2244,3 +2256,38 @@ def test_the_cli_passes_the_read_options_through(capsys):
     with pytest.raises(SystemExit):
         cli.main(["doctor", "--model", "shisa-ai/shisa-de-1", "--reads", "double"])
     assert "not defined for de1" in capsys.readouterr().err
+
+
+def test_each_de2_read_is_tempered_by_its_own_fit():
+    record = calibration_for("de2")
+    server = StubDE2Server(logprob=lambda code: -1.0 if code == "A" else -1.5,
+                           thought=[ord("x"), int(ANSWER_TOKEN_ID)])
+    model = DecisionModel(base_url="http://test.local", model="shisa-ai/shisa-de-2", api_key="",
+                          transport=httpx.MockTransport(server))
+    model.readout._tokenizer = server.tokenizer
+    with model:
+        assert model.calibration_applied
+        raw = model.decide("state", {"q": wide_choice(3)}, reads="single", calibrated=False).answers["q"]
+        assert (raw.calibrated, raw.temperature) == (False, 1.0)
+        for override, strategy, read in (({"reads": "single"}, "direct", "direct"),
+                                         ({"reasoning": False}, "repeat2", "repeat2"),
+                                         ({}, "repeat2-think", "think")):
+            answer = model.decide("state", {"q": wide_choice(3)}, **override).answers["q"]
+            assert answer.strategy == strategy and answer.calibrated
+            assert answer.temperature == record.reads[read]["choice"]
+            # Tempering flattens the distribution and keeps the chosen option.
+            assert answer.choice == raw.choice
+            assert max(answer.probabilities.values()) < max(raw.probabilities.values())
+        noul = model.decide("state", {"q": Noul("Yes?")}, reasoning=False).answers["q"]
+        assert noul.temperature == record.reads["repeat2"]["noul"]
+
+
+def test_a_record_without_per_read_fits_leaves_a_thought_raw():
+    single = Calibration(temperatures={"noul": 2.0, "choice": 2.0}, readout_version=DE2_READOUT_VERSION,
+                         model="de2-test", serving_shape="test", fitted_on="", test_ece={}, source="", family="de2")
+    server = StubDE2Server(logprob=lambda code: -1.0, thought=[ord("x"), int(ANSWER_TOKEN_ID)])
+    with make_de2_model(server, calibration=single) as model:
+        thought = model.decide("state", {"q": wide_choice(3)}).answers["q"]
+        assert (thought.strategy, thought.calibrated, thought.temperature) == ("repeat2-think", False, 1.0)
+        plain = model.decide("state", {"q": wide_choice(3)}, reasoning=False).answers["q"]
+        assert (plain.calibrated, plain.temperature) == (True, 2.0)

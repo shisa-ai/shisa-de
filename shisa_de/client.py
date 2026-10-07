@@ -746,10 +746,13 @@ class DecisionModel:
         thought_tokens = 0
         for head, question, read, options in results:
             if isinstance(read, PolicyRead):
-                # A distribution read after a thought is not the read any record
-                # was fitted on, so it is returned raw.
+                # Each read is tempered by its own fit. A record without per-read
+                # temperatures was fitted on a read before any thought, so an
+                # answer read after one stays raw under it.
+                covered = bool(self.calibration.reads) or read.thought is None
                 answer = _answer_from_read(question, read.read, options, self.calibration,
-                                           calibrated and self.calibration_applied and read.thought is None)
+                                           calibrated and self.calibration_applied and covered,
+                                           read_name=read.components[-1][0])
                 answer.strategy = read.strategy
                 answer.stages = answer.logical_reads = read.logical_reads
                 answer.requests = read.requests
@@ -778,7 +781,8 @@ class DecisionModel:
                 continue
             logical_reads += 1
             answer = _answer_from_read(question, read, options, self.calibration,
-                                       calibrated and self.calibration_applied)
+                                       calibrated and self.calibration_applied,
+                                       read_name="image" if image_url is not None else "direct")
             decision.answers[head] = answer
             decision.raw[head] = {
                 "logprobs": read.logprobs,
@@ -835,9 +839,10 @@ def _answer_from_read(
     options: Sequence[tuple[str, Any]],
     calibration: Calibration,
     calibrated: bool,
+    read_name: str | None = None,
 ) -> Answer:
     """Turn one letter read into a typed answer, tempering if asked."""
-    temperature = calibration.temperature_for(question.type) if calibrated else 1.0
+    temperature = calibration.temperature_for(question.type, read_name) if calibrated else 1.0
     applied = calibrated and temperature != 1.0
     letters = codes_for(len(options))
     raw = {letter: read.probabilities[letter] for letter in letters}

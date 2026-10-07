@@ -30,7 +30,7 @@ server. Re-measure on the endpoint you deploy against.
 | Reading the codes | Top 20 logprobs, one fallback request per missing letter | Every code requested by token id ([section 3](#3-reading-the-codes)) |
 | Wide text choices | 27 to 676 through chunked finalist selection | 27 to 256 in one prompt; above 256 rejected |
 | Thinking | Never | When the first read is unsure ([section 4](#4-the-thinking-read)) |
-| Calibration | Bundled temperatures for `shisa-ai/shisa-de-1` | None fitted ([section 7](#7-calibration)) |
+| Calibration | Bundled temperatures for `shisa-ai/shisa-de-1` | Bundled temperatures per read for `shisa-ai/shisa-de-2` ([section 7](#7-calibration)) |
 | Images | One direct read on the chat endpoint | The same ([section 6](#6-images)) |
 
 Up to 26 options the two contracts render the same one-pass prompt: the codes
@@ -335,23 +335,67 @@ makes it an error, for a server whose template has been fixed.
 
 ## 7. Calibration
 
-No temperature has been fitted for `de2-codebook-v1`. The bundled DE-2 record
-holds 1.0 for both question types, every DE-2 answer has `calibrated=False`, and
-`calibrated=True` returns raw probabilities rather than raising.
+Raw DE-2 probabilities are overconfident, and by a different amount on each
+read, so the bundled record holds one pair of temperatures per read. The client
+applies the entry for the read an answer came from:
 
-One fit has been attempted and is recorded, not applied, under `withheld` in
-`shisa_de/data/calibration-de2.json`. It was made on the one-pass scaffold
-rather than the repeated read, in-sample on 576 questions from 192 Japanese
-rows where the checkpoint is at ceiling, through Transformers rather than a
-server. Its noul optimum, 1.36, moved in-sample expected calibration error from
-0.0233 to 0.0263, and its choice optimum sat on the grid floor.
+| Read | `Answer.strategy` | noul | choice and score |
+| --- | --- | ---: | ---: |
+| `direct` | `direct` | 2.69 | 1.81 |
+| `repeat2` | `repeat2` | 2.76 | 1.89 |
+| `think` | `repeat2-think` | 6.8 | 6.8 |
 
-To calibrate DE-2, fit on this readout, on the serving shape, with a held-out
-split, write a record whose `readout_version` is `de2-codebook-v1`, and pass it
-as `DecisionModel(calibration=...)` or `--calibration path.json`. A record fitted
-against a DE-1 readout does not apply; [the DE-1 page](READOUT.md#8-calibration)
-has the rule. An answer read after a thought is never tempered, whatever record
-is supplied: no fit covers that read.
+Tempering never changes the chosen option, and the gate reads the raw
+distribution, so calibration does not change which questions think. Image
+answers have no entry and stay raw. `calibrated=False` returns raw
+probabilities; `Answer.calibrated` and `Answer.temperature` say what each
+answer carries.
+
+Measured on 2026-10-08 against `shisa-ai/shisa-de-2` on a local vLLM 0.30.0
+server (merged BF16, Triton attention, one RTX PRO 6000, 64 concurrent
+requests), through this client. 9,931 questions from 53 of the research
+repository's evaluation suites were read once and twice; the 529 below the gate
+were sent to the thinking read and 475 thought. Every suite carries equal
+weight. `direct` and `repeat2` were fitted on one half of the question groups
+and measured on the other:
+
+| Read | Type | Test questions | Accuracy | Mean confidence, raw | ECE, raw | ECE, tempered |
+| --- | --- | ---: | ---: | ---: | ---: | ---: |
+| `direct` | noul | 1,895 | 92.4% | 97.3% | 0.059 | 0.032 |
+| `direct` | choice | 3,140 | 80.0% | 92.0% | 0.121 | 0.070 |
+| `repeat2` | noul | 1,895 | 92.4% | 98.2% | 0.059 | 0.023 |
+| `repeat2` | choice | 3,140 | 82.1% | 93.1% | 0.110 | 0.048 |
+| `think` | both | 475 | 51.8% | 92.3% | 0.411 | 0.184 |
+
+The `think` entry is one temperature for both types, fitted on all 475 thoughts
+(430 choice, 45 noul) and measured by 5-fold cross-validation. It more than
+halves the error and is still poorly calibrated: treat a probability read after
+a thought as rough. Over the policy's whole output on the held-out half (5,011
+questions), ECE moves from 0.091 raw to 0.021.
+
+Limits of this fit, also recorded in the record's `note`:
+
+- The suites are evaluation suites; their overlap with the training pool was not
+  checked, and overlap would bias the temperatures low.
+- 84% English and 16% Japanese, no image questions, one serving shape.
+- 383 of the 475 thoughts were cut by the 1,024-token budget.
+- At 64 concurrent requests, 54 of the 529 questions below the gate read at or
+  above it on a second pass and did not think.
+
+The record is applied on its own only to `shisa-ai/shisa-de-2`. Another DE-2
+checkpoint gets raw probabilities and a warning, as on DE-1. To calibrate one,
+fit on this readout and your serving shape with
+`scripts/calibrate_de2_collect.py` and `scripts/calibrate_de2_fit.py`, write a
+record whose `readout_version` is `de2-codebook-v1` with a `reads` table, and
+pass it as `DecisionModel(calibration=...)` or `--calibration path.json`. A
+record without a `reads` table is one fit for the reads before any thought, and
+an answer read after a thought stays raw under it. A record fitted against a
+DE-1 readout does not apply; [the DE-1 page](READOUT.md#8-calibration) has the
+rule.
+
+An earlier fit on a candidate adapter is kept, not applied, under `withheld` in
+`shisa_de/data/calibration-de2.json`: it was made on the one-pass scaffold,
+in-sample, through Transformers rather than a server.
 
 ## 8. Serving
 
