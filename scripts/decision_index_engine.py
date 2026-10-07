@@ -3,6 +3,8 @@
 Requires the separately installed, pinned Decision Index reproduction kit.
 Run with ``--engine scripts.decision_index_engine:ShisaDE2Engine``. Use the
 upstream runner's ``--compact`` flag to keep benchmark text out of results.
+``--option policy=repeat`` reads twice and never thinks; the default is the
+adaptive ``repeat-think``.
 """
 from __future__ import annotations
 
@@ -29,26 +31,30 @@ class ShisaDE2Engine(Engine):
     )
 
     def __init__(self, *, model, tokenizer, base_url, max_tokens=32768,
-                 serving_manifest, **options):
+                 serving_manifest, policy="repeat-think", **options):
         if options:
             raise ValueError(f"Unknown engine options: {sorted(options)}")
         super().__init__()
         if not base_url.startswith(("http://127.0.0.1:", "http://localhost:")):
             raise ValueError("This benchmark engine requires an explicit local endpoint")
+        if policy not in ("repeat", "repeat-think"):
+            raise ValueError("policy must be 'repeat' or 'repeat-think'")
+        thinks = policy == "repeat-think"
         self.max_tokens = int(max_tokens)
         if self.max_tokens < 2:
             raise ValueError("max_tokens must be at least 2")
         self.model = DecisionModel(
             base_url=base_url, model=model, tokenizer=tokenizer,
-            local_files_only=True, family="de2", policy="repeat-think",
+            local_files_only=True, family="de2", policy=policy,
             think_gate=0.7, think_budget=1024, max_workers=1, timeout=600,
         )
         root = Path(__file__).resolve().parents[1]
         self.provenance = {
             "model": model, "tokenizer": tokenizer,
             "readout_version": READOUT_VERSIONS["de2"],
-            "policy": "repeat-think", "think_gate": 0.7, "think_budget": 1024,
-            "think_option_cap": 26, "calibration": "none", "max_tokens": self.max_tokens,
+            "policy": policy, "think_gate": 0.7 if thinks else None,
+            "think_budget": 1024 if thinks else None,
+            "think_option_cap": 26 if thinks else None, "calibration": "none", "max_tokens": self.max_tokens,
             "max_options": MAX_CODES, "max_workers": 1,
             "context_overflow": "unsupported; no truncation or single-read fallback",
             "noul_options": "Yes/No; optional criteria descriptions are not rendered",
