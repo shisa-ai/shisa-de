@@ -37,15 +37,7 @@ from .family import resolve_family
 from .images import prepare_image
 from .questions import MAX_OPTIONS, Choice, Noul, Question, QuestionError, Score
 from .overflow import OVERFLOW_STRATEGY, OverflowRead, read_overflow, validate_overflow
-from .policy import (
-    DEFAULT_POLICY,
-    FAMILY_POLICIES,
-    THINK_BUDGET,
-    THINK_GATE,
-    THINK_OPTION_CAP,
-    PolicyRead,
-    read_policy,
-)
+from .policy import THINK_OPTION_CAP, PolicyRead, ReadOptions, read_policy, resolve_options
 from .readout import MAX_CODES, READOUT_VERSIONS, LetterRead, Readout, ReadoutError, codes_for
 
 DEFAULT_ENDPOINT = "https://api.shisa.ai/openai"
@@ -280,6 +272,23 @@ class DecisionModel:
     tokenizer source, and otherwise assumed to be DE-2 with a warning.
     ``policy`` selects the DE-2 read: ``"repeat-think"`` (the default),
     ``"repeat"`` or ``"direct"``; DE-1 is always ``"direct"``.
+
+    The same read can be set a part at a time, here as the model's default or
+    on one `classify` / `decide` call:
+
+    - ``reads``: ``"single"`` or ``"double"``, how often the user turn is written.
+    - ``reasoning``: think when the read is unsure, then read again.
+    - ``reasoning_prob``: the top probability below which it thinks (0.7).
+      ``think_gate`` is the same setting.
+    - ``reasoning_len``: the most tokens a thought may run to (1,024).
+      ``think_budget`` is the same setting.
+    - ``compound``: read a DE-1 text choice above 26 options in two rounds.
+      ``overflow="finalist-top1"`` / ``"error"`` is the same setting.
+
+    DE-2 defaults to a double read with reasoning; DE-1 to a single read with
+    compound on. A combination a family's contract does not define (a double
+    read or reasoning on DE-1, compound on DE-2, reasoning after a single read)
+    raises `ValueError`.
     """
 
     def __init__(
@@ -295,12 +304,17 @@ class DecisionModel:
         max_workers: int = 8,
         image_top_logprobs: int = 20,
         max_logprobs: int = 20,
-        overflow: str = OVERFLOW_STRATEGY,
+        overflow: str | None = None,
         calibration: Calibration | None = None,
         family: str | None = None,
         policy: str | None = None,
-        think_gate: float = THINK_GATE,
-        think_budget: int = THINK_BUDGET,
+        think_gate: float | None = None,
+        think_budget: int | None = None,
+        reads: str | None = None,
+        reasoning: bool | None = None,
+        reasoning_prob: float | None = None,
+        reasoning_len: int | None = None,
+        compound: bool | None = None,
         transport: httpx.BaseTransport | None = None,
         readout: Readout | None = None,
     ) -> None:
@@ -321,18 +335,12 @@ class DecisionModel:
                 stacklevel=2,
             )
         self.readout_version = READOUT_VERSIONS[self.family]
-        self.policy = policy or DEFAULT_POLICY[self.family]
-        if self.policy not in FAMILY_POLICIES[self.family]:
-            raise ValueError(
-                f"policy {self.policy!r} is not defined for {self.family}; "
-                f"expected one of {list(FAMILY_POLICIES[self.family])}"
-            )
-        if not 0.0 <= float(think_gate) <= 1.0:
-            raise ValueError("think_gate must be a probability")
-        if isinstance(think_budget, bool) or not isinstance(think_budget, int) or think_budget < 1:
-            raise ValueError("think_budget must be a positive integer")
-        self.think_gate = float(think_gate)
-        self.think_budget = think_budget
+        # The model's defaults. A call may override any of them for itself.
+        self.options = resolve_options(
+            self.family, policy=policy or None, reads=reads, reasoning=reasoning,
+            reasoning_prob=reasoning_prob, reasoning_len=reasoning_len, compound=compound,
+            think_gate=think_gate, think_budget=think_budget, overflow=overflow,
+        )
         # A record chosen for the caller is applied only to the checkpoint it was
         # fitted on. A record the caller passes is their assertion and is applied
         # as given; `health` still reports how far it matches.
@@ -350,9 +358,6 @@ class DecisionModel:
                 stacklevel=2,
             )
         self.max_workers = max(1, int(max_workers))
-        if overflow not in (OVERFLOW_STRATEGY, "error"):
-            raise ValueError("overflow must be 'finalist-top1' or 'error'")
-        self.overflow = overflow
         if isinstance(max_logprobs, bool) or not isinstance(max_logprobs, int) or max_logprobs < 1:
             raise ValueError("max_logprobs must be a positive integer")
         if isinstance(image_top_logprobs, bool) or not isinstance(image_top_logprobs, int) or image_top_logprobs < 1:
@@ -372,6 +377,39 @@ class DecisionModel:
                 api_key=api_key if api_key is not None else _api_key_from_env(),
                 transport=transport,
             )
+
+    # -- the model's default read ------------------------------------------
+
+    @property
+    def policy(self) -> str:
+        return self.options.policy
+
+    @property
+    def reads(self) -> str:
+        return self.options.reads
+
+    @property
+    def reasoning(self) -> bool:
+        return self.options.reasoning
+
+    @property
+    def think_gate(self) -> float:
+        return self.options.think_gate
+
+    @property
+    def think_budget(self) -> int:
+        return self.options.think_budget
+
+    reasoning_prob = think_gate
+    reasoning_len = think_budget
+
+    @property
+    def overflow(self) -> str:
+        return self.options.overflow
+
+    @property
+    def compound(self) -> bool:
+        return self.options.compound
 
     # -- constructors ------------------------------------------------------
 
@@ -423,6 +461,9 @@ class DecisionModel:
             "family_explicit": self.family_explicit,
             "readout_version": self.readout_version,
             "policy": self.policy,
+            "reads": self.reads,
+            "reasoning": self.reasoning,
+            "compound": self.compound,
             "calibration": self.calibration.id,
             "calibration_model": self.calibration.model,
             "calibration_readout_version": self.calibration.readout_version,
@@ -492,6 +533,12 @@ class DecisionModel:
         image: str | Path | None = None,
         calibrated: bool | None = None,
         debug: bool = False,
+        policy: str | None = None,
+        reads: str | None = None,
+        reasoning: bool | None = None,
+        reasoning_prob: float | None = None,
+        reasoning_len: int | None = None,
+        compound: bool | None = None,
     ) -> Decision:
         """Classify a state against named label sets.
 
@@ -512,6 +559,10 @@ class DecisionModel:
         skips the thinking read. It does not change calibration or the return
         shape; ``include_probabilities`` controls the dict view only.
 
+        ``policy``, ``reads``, ``reasoning``, ``reasoning_prob``,
+        ``reasoning_len`` and ``compound`` override the model's defaults for
+        this call only; see `DecisionModel`.
+
         Returns a `Decision`: ``result["intent"]`` is the chosen label, and
         ``result.answers["intent"]`` carries the distribution behind it.
         """
@@ -521,7 +572,10 @@ class DecisionModel:
             question, options = _question_from_head(head, spec)
             questions[head] = question
             parsed[head] = options
-        decision = self._run(state, questions, image=image, calibrated=calibrated, probability=probability, debug=debug)
+        settings = resolve_options(self.family, self.options, policy=policy, reads=reads, reasoning=reasoning,
+                                   reasoning_prob=reasoning_prob, reasoning_len=reasoning_len, compound=compound)
+        decision = self._run(state, questions, image=image, calibrated=calibrated, probability=probability,
+                             debug=debug, settings=settings, asked_reasoning=bool(reasoning))
         for head, question in questions.items():
             if isinstance(question, _MultiLabel):
                 threshold = parsed[head]["cls_threshold"]
@@ -564,6 +618,12 @@ class DecisionModel:
         image: str | Path | None = None,
         calibrated: bool | None = None,
         debug: bool = False,
+        policy: str | None = None,
+        reads: str | None = None,
+        reasoning: bool | None = None,
+        reasoning_prob: float | None = None,
+        reasoning_len: int | None = None,
+        compound: bool | None = None,
     ) -> Decision:
         """Ask typed questions and get typed answers.
 
@@ -578,9 +638,16 @@ class DecisionModel:
         rejects choice overflow, and DE-2 skips the thinking read. It leaves
         calibration and the return shape unchanged. Letter-recovery requests
         are still allowed for the same answer position.
+
+        ``policy``, ``reads``, ``reasoning``, ``reasoning_prob``,
+        ``reasoning_len`` and ``compound`` override the model's defaults for
+        this call only; see `DecisionModel`.
         """
         parsed = {head: _question_from_head(head, spec)[0] for head, spec in questions.items()}
-        decision = self._run(state, parsed, image=image, calibrated=calibrated, probability=probability, debug=debug)
+        settings = resolve_options(self.family, self.options, policy=policy, reads=reads, reasoning=reasoning,
+                                   reasoning_prob=reasoning_prob, reasoning_len=reasoning_len, compound=compound)
+        decision = self._run(state, parsed, image=image, calibrated=calibrated, probability=probability,
+                             debug=debug, settings=settings, asked_reasoning=bool(reasoning))
         for head, answer in decision.answers.items():
             decision[head] = answer.value
         return decision
@@ -598,9 +665,14 @@ class DecisionModel:
         calibrated: bool | None,
         probability: bool,
         debug: bool,
+        settings: ReadOptions,
+        asked_reasoning: bool = False,
     ) -> Decision:
         if not isinstance(probability, bool):
             raise ValueError("probability must be a boolean")
+        if probability and asked_reasoning:
+            raise ValueError("probability=True takes one logical read per question; it cannot be "
+                             "combined with reasoning=True")
         started = time.perf_counter()
         image_url = prepare_image(image) if image is not None else None
         requested_calibration = calibrated
@@ -616,7 +688,7 @@ class DecisionModel:
 
         # A probability call takes one logical read per question, so on DE-2 it
         # stops at the repeated read: an answer read after a thought is a second.
-        policy = "repeat" if probability and self.policy == "repeat-think" else self.policy
+        policy = "repeat" if probability and settings.policy == "repeat-think" else settings.policy
 
         # Validate every head before issuing any requests.
         overflow_heads = set()
@@ -634,7 +706,7 @@ class DecisionModel:
                         f"head {head!r}: probability=True requires a single read; "
                         f"reduce the choice to at most {MAX_OPTIONS} options"
                     )
-                if self.overflow == "error":
+                if not settings.compound:
                     raise QuestionError(f"head {head!r}: overflow='error' rejects choices above {MAX_OPTIONS} options")
                 if image_url is not None:
                     raise QuestionError("image choice overflow is not supported")
@@ -656,7 +728,7 @@ class DecisionModel:
                 options = question.options()
             elif self.family == "de2":
                 read = read_policy(self.readout, state, question, policy=policy,
-                                   think_gate=self.think_gate, think_budget=self.think_budget, debug=debug)
+                                   think_gate=settings.think_gate, think_budget=settings.think_budget, debug=debug)
                 options = question.options()
             else:
                 read, options = self.readout.evaluate(state, question, debug=debug)
@@ -752,7 +824,7 @@ class DecisionModel:
             "strategy_by_head": {head: answer.strategy for head, answer in decision.answers.items()},
         }
         if self.family == "de2":
-            decision.meta.update(think_gate=self.think_gate, think_budget=self.think_budget,
+            decision.meta.update(think_gate=settings.think_gate, think_budget=settings.think_budget,
                                  think_option_cap=THINK_OPTION_CAP)
         return decision
 

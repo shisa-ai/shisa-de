@@ -12,6 +12,12 @@ one. `docs/READOUT-DE2.md` is the contract; this module sequences the reads
 
 `repeat` stops after step 1 and `direct` reads the scaffold once. The gate reads
 the raw distribution, before any calibration, as the measured policy did.
+
+`ReadOptions` holds the settings one question is read under, and
+`resolve_options` layers them: the family's defaults, then the model's, then
+one call's. The option names (`reads`, `reasoning`, `compound`) select among the
+reads the two contracts define; a combination neither defines is an error
+rather than an unmeasured read.
 """
 from __future__ import annotations
 
@@ -19,6 +25,7 @@ import time
 from dataclasses import dataclass
 from typing import Any
 
+from .overflow import OVERFLOW_STRATEGY
 from .questions import MAX_OPTIONS, Question
 from .readout import MAX_CODES, LetterRead, Readout, Thought
 
@@ -37,6 +44,129 @@ THINK_BUDGET = 1024
 
 #: `Answer.strategy` for each way a policy can end.
 DIRECT, REPEAT, REPEAT_THINK = "direct", "repeat2", "repeat2-think"
+
+READS = ("single", "double")
+OVERFLOWS = (OVERFLOW_STRATEGY, "error")
+#: Each policy as (reads, reasoning). A single read that reasons is not one of them.
+_POLICY_PARTS = {"direct": ("single", False), "repeat": ("double", False), "repeat-think": ("double", True)}
+_PARTS_POLICY = {parts: name for name, parts in _POLICY_PARTS.items()}
+
+
+@dataclass(frozen=True)
+class ReadOptions:
+    """The settings one question is read under."""
+
+    family: str
+    policy: str
+    think_gate: float = THINK_GATE
+    think_budget: int = THINK_BUDGET
+    overflow: str = OVERFLOW_STRATEGY
+
+    @property
+    def reads(self) -> str:
+        """`single` or `double`: how many times the user turn is written."""
+        return _POLICY_PARTS[self.policy][0]
+
+    @property
+    def reasoning(self) -> bool:
+        """Whether an unsure read is followed by a thought and a second read."""
+        return _POLICY_PARTS[self.policy][1]
+
+    @property
+    def reasoning_prob(self) -> float:
+        return self.think_gate
+
+    @property
+    def reasoning_len(self) -> int:
+        return self.think_budget
+
+    @property
+    def compound(self) -> bool:
+        """Whether a DE-1 text choice above 26 options is read in two rounds."""
+        return self.family == "de1" and self.overflow == OVERFLOW_STRATEGY
+
+
+def _one_of(old_name: str, old: Any, new_name: str, new: Any) -> Any:
+    """The value of a setting that has two names; both may be given if they agree."""
+    if old is not None and new is not None and old != new:
+        raise ValueError(f"{new_name}={new!r} and {old_name}={old!r} set the same thing; pass one")
+    return new if new is not None else old
+
+
+def resolve_options(
+    family: str,
+    base: ReadOptions | None = None,
+    *,
+    policy: str | None = None,
+    reads: str | None = None,
+    reasoning: bool | None = None,
+    reasoning_prob: float | None = None,
+    reasoning_len: int | None = None,
+    compound: bool | None = None,
+    think_gate: float | None = None,
+    think_budget: int | None = None,
+    overflow: str | None = None,
+) -> ReadOptions:
+    """Layer one level of settings over `base`, or over the family's defaults.
+
+    Anything left as `None` is inherited. `policy` names a whole read; `reads`
+    and `reasoning` change one part of the inherited one. `reasoning=True`
+    reads twice first and `reads="single"` does not reason, because the
+    contract's only thinking read follows a repeated one. `reasoning_prob` /
+    `think_gate`, `reasoning_len` / `think_budget` and `compound` / `overflow`
+    are the same settings under two names.
+    """
+    if base is None:
+        base = ReadOptions(family, DEFAULT_POLICY[family])
+    if policy is not None and policy not in POLICIES:
+        raise ValueError(f"unknown policy {policy!r}; expected one of {list(POLICIES)}")
+    if reads is not None and reads not in READS:
+        raise ValueError(f"reads must be 'single' or 'double', got {reads!r}")
+    for name, flag in (("reasoning", reasoning), ("compound", compound)):
+        if flag is not None and not isinstance(flag, bool):
+            raise ValueError(f"{name} must be a boolean")
+    if reads == "single" and reasoning:
+        raise ValueError("reasoning=True follows a repeated read; it cannot be combined with reads='single'")
+
+    count, thinks = _POLICY_PARTS[policy or base.policy]
+    if reasoning is not None:
+        thinks = reasoning
+        count = "double" if reasoning else count
+    if reads is not None:
+        count = reads
+        thinks = thinks and reads == "double"
+    resolved = _PARTS_POLICY[(count, thinks)]
+    if policy is not None and resolved != policy:
+        given = ", ".join(f"{name}={value!r}" for name, value in (("reads", reads), ("reasoning", reasoning))
+                          if value is not None)
+        raise ValueError(f"policy={policy!r} disagrees with {given}; pass one or the other")
+    if resolved not in FAMILY_POLICIES[family]:
+        raise ValueError(
+            f"policy {resolved!r} is not defined for {family}; "
+            f"expected one of {list(FAMILY_POLICIES[family])}"
+        )
+
+    gate = _one_of("think_gate", think_gate, "reasoning_prob", reasoning_prob)
+    if gate is None:
+        gate = base.think_gate
+    elif isinstance(gate, bool) or not isinstance(gate, (int, float)) or not 0.0 <= gate <= 1.0:
+        raise ValueError("reasoning_prob (think_gate) must be a probability")
+    budget = _one_of("think_budget", think_budget, "reasoning_len", reasoning_len)
+    if budget is None:
+        budget = base.think_budget
+    elif isinstance(budget, bool) or not isinstance(budget, int) or budget < 1:
+        raise ValueError("reasoning_len (think_budget) must be a positive integer")
+
+    if overflow is not None and overflow not in OVERFLOWS:
+        raise ValueError("overflow must be 'finalist-top1' or 'error'")
+    if compound and family != "de1":
+        raise ValueError(
+            f"compound=True is not defined for {family}: it reads a text choice of up to "
+            f"{MAX_CODES} options in one prompt"
+        )
+    wide = _one_of("overflow", overflow, "compound",
+                   None if compound is None else OVERFLOWS[0] if compound else OVERFLOWS[1])
+    return ReadOptions(family, resolved, float(gate), budget, wide or base.overflow)
 
 
 @dataclass
@@ -137,5 +267,6 @@ def read_policy(
     return done(REPEAT_THINK, [(REPEAT, first), ("think", readout.read_codes(after, slots, debug=debug))], thought)
 
 
-__all__ = ["DEFAULT_POLICY", "DIRECT", "FAMILY_POLICIES", "POLICIES", "PolicyRead", "REPEAT",
-           "REPEAT_THINK", "THINK_BUDGET", "THINK_GATE", "THINK_OPTION_CAP", "read_policy"]
+__all__ = ["DEFAULT_POLICY", "DIRECT", "FAMILY_POLICIES", "POLICIES", "PolicyRead", "READS", "REPEAT",
+           "REPEAT_THINK", "ReadOptions", "THINK_BUDGET", "THINK_GATE", "THINK_OPTION_CAP", "read_policy",
+           "resolve_options"]

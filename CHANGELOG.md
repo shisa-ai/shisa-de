@@ -1,5 +1,27 @@
 # Changelog
 
+## 0.4.0
+
+Read settings by part, per model and per call. No answer changes: both readout
+versions are unchanged, and every setting selects a read 0.3.0 already had.
+
+- Add `reads` (`"single"` / `"double"`), `reasoning`, `reasoning_prob`,
+  `reasoning_len` and `compound` to `DecisionModel`. `policy`, `think_gate`,
+  `think_budget` and `overflow` remain and mean the same thing; passing both
+  names with different values is an error.
+- Accept `policy`, `reads`, `reasoning`, `reasoning_prob`, `reasoning_len` and
+  `compound` on `classify` and `decide` to override the model's defaults for one
+  call. `result.meta` records what the call ran under.
+- Reject combinations neither contract defines: a double read or reasoning on
+  DE-1, `compound=True` on DE-2, reasoning after a single read, and
+  `reasoning=True` with `probability=True`.
+- Add `--reads`, `--reasoning` / `--no-reasoning`, `--reasoning-prob`,
+  `--reasoning-len` and `--compound` / `--no-compound` to the CLI. `doctor
+  --json` reports `reads`, `reasoning` and `compound`.
+- Expose `ReadOptions`, `resolve_options` and `READS`.
+- `DecisionModel.policy`, `think_gate`, `think_budget` and `overflow` are now
+  read-only views of `DecisionModel.options`.
+
 ## 0.3.0
 
 DE-2 support. DE-1 answers are unchanged: the DE-1 readout is still

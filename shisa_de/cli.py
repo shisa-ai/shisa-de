@@ -18,7 +18,7 @@ from typing import Any
 from .calibration import CALIBRATION_FILES, resolve_calibration
 from .client import DEFAULT_ENDPOINT, DEFAULT_MODEL, DecisionModel, _api_key_from_env
 from .family import FAMILIES
-from .policy import POLICIES
+from .policy import POLICIES, READS, THINK_BUDGET, THINK_GATE
 from .readout import INPUT_REPEAT, LETTERS, MAX_CODES
 from .questions import Choice
 
@@ -60,6 +60,16 @@ def _common(parser: argparse.ArgumentParser) -> None:
                              "the model id, then the tokenizer, otherwise assumed to be de2")
     parser.add_argument("--policy", default=None, choices=POLICIES,
                         help="the DE-2 read. Default: repeat-think for de2; de1 is always direct")
+    parser.add_argument("--reads", default=None, choices=READS,
+                        help="how often the question is written. Default: double for de2; de1 is always single")
+    parser.add_argument("--reasoning", default=None, action=argparse.BooleanOptionalAction,
+                        help="think when the read is unsure, then read again. Default: on for de2")
+    parser.add_argument("--reasoning-prob", type=float, default=None, metavar="P",
+                        help=f"think when the top probability is below P (default: {THINK_GATE})")
+    parser.add_argument("--reasoning-len", type=int, default=None, metavar="N",
+                        help=f"the most tokens a thought may run to (default: {THINK_BUDGET})")
+    parser.add_argument("--compound", default=None, action=argparse.BooleanOptionalAction,
+                        help="read a de1 choice above 26 options in two rounds. Default: on for de1")
     parser.add_argument("--timeout", type=float, default=120.0)
 
 
@@ -100,7 +110,8 @@ def main(argv: list[str] | None = None) -> int:
             base_url=args.base_url, model=args.model, tokenizer=args.tokenizer, timeout=args.timeout,
             image_top_logprobs=getattr(args, "image_top_logprobs", 20),
             calibration=resolve_calibration(args.calibration),
-            family=args.family, policy=args.policy,
+            family=args.family, policy=args.policy, reads=args.reads, reasoning=args.reasoning,
+            reasoning_prob=args.reasoning_prob, reasoning_len=args.reasoning_len, compound=args.compound,
         )
     except ValueError as exc:
         parser.error(str(exc))

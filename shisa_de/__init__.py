@@ -29,7 +29,17 @@ from .calibration import (
 from .client import DEFAULT_ENDPOINT, DEFAULT_MODEL, Answer, Decision, DecisionModel
 from .family import DEFAULT_FAMILY, FAMILIES, family_is_explicit, model_family, resolve_family
 from .images import ImageError
-from .policy import POLICIES, THINK_BUDGET, THINK_GATE, THINK_OPTION_CAP, PolicyRead, read_policy
+from .policy import (
+    POLICIES,
+    READS,
+    THINK_BUDGET,
+    THINK_GATE,
+    THINK_OPTION_CAP,
+    PolicyRead,
+    ReadOptions,
+    read_policy,
+    resolve_options,
+)
 from .questions import MAX_OPTIONS, Choice, Noul, Question, QuestionError, Score
 from .readout import (
     DE2_READOUT_VERSION,
@@ -46,7 +56,7 @@ from .readout import (
     softmax,
 )
 
-__version__ = "0.3.0"
+__version__ = "0.4.0"
 
 __all__ = [
     "Answer",
@@ -72,6 +82,8 @@ __all__ = [
     "Question",
     "QuestionError",
     "READOUT_VERSION",
+    "READS",
+    "ReadOptions",
     "READOUT_VERSIONS",
     "Readout",
     "ReadoutError",
@@ -91,6 +103,7 @@ __all__ = [
     "model_family",
     "read_policy",
     "resolve_family",
+    "resolve_options",
     "resolve_calibration",
     "softmax",
     "temper_binary",

@@ -678,7 +678,9 @@ rendering a wide question still raises `QuestionError`. The 676-option client
 limit gives at most 26 finalists without recursion. Tests cover that structural
 limit; live quality evidence covers at most 151 options, not all 676.
 
-Pass `overflow="error"` to retain strict rejection. Image choices and ordered
+Pass `overflow="error"` to retain strict rejection. `compound=True` / `False`
+is the same setting under another name, and can also be passed to one
+`classify` / `decide` call. Image choices and ordered
 scores above 26 are rejected, as are choices above 676. All heads are validated
 before requests begin. An overflow request failure raises without returning a
 partial decision; requests already sent still consume endpoint resources.

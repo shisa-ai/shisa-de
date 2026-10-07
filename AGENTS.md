@@ -69,7 +69,7 @@ What must not change casually:
 | `docs/READOUT-DE2.md` | The DE-2 contract: codebook, repeated read, code request, thinking read, serving, measured costs |
 | `README.md` | The API surface users see first; links to both readout pages |
 | `shisa_de/readout.py` | Rendering, slot and code resolution, boundary checks, requests, fallback, thought generation, softmax, readout versions |
-| `shisa_de/policy.py` | The DE-2 policy: repeated read, gate, thought, read after it |
+| `shisa_de/policy.py` | The DE-2 policy: repeated read, gate, thought, read after it; `ReadOptions` and the per-model and per-call settings that select a read |
 | `shisa_de/client.py` | `DecisionModel.classify`, `DecisionModel.decide`, `health`, `Decision`, `Answer` |
 | `shisa_de/overflow.py` | Balanced chunks, top-one finalists, conditional score maps; DE-1 text choices only |
 | `shisa_de/questions.py` | `Noul`, `Choice`, `Score` and their wire shapes |

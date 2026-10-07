@@ -33,7 +33,7 @@ from shisa_de.calibration import (
 from shisa_de.family import family_is_explicit, model_family, resolve_family
 from shisa_de.client import Decision, _MultiLabel, _question_from_head
 from shisa_de.images import ImageError, prepare_image, validate_image_url
-from shisa_de.policy import read_policy
+from shisa_de.policy import ReadOptions, read_policy, resolve_options
 from shisa_de.questions import MAX_OPTIONS, QuestionError, render_option
 from shisa_de.readout import (
     ANSWER_PREFIX,
@@ -2112,3 +2112,135 @@ def test_doctor_probe_reports_the_read_and_the_chat_render(capsys):
     assert "read probe      passed (repeat2, 1 requests)" in output
     assert "chat system     differs" in output
     assert "family          de2 (model id)" in output and "de2-codebook-v1, policy repeat-think" in output
+
+
+# -- read options: the model's defaults and one call's overrides -----------------
+
+
+def test_each_family_has_its_default_read_options():
+    de1, de2 = resolve_options("de1"), resolve_options("de2")
+    assert (de1.policy, de1.reads, de1.reasoning, de1.compound) == ("direct", "single", False, True)
+    assert (de2.policy, de2.reads, de2.reasoning, de2.compound) == ("repeat-think", "double", True, False)
+    assert (de2.reasoning_prob, de2.reasoning_len) == (0.7, 1024)
+
+
+@pytest.mark.parametrize("given,policy", [
+    ({}, "repeat-think"),
+    ({"reasoning": False}, "repeat"),
+    ({"reads": "single"}, "direct"),           # a single read never reasons
+    ({"reads": "double"}, "repeat-think"),
+    ({"policy": "direct", "reasoning": False}, "direct"),
+    ({"policy": "repeat", "reads": "double"}, "repeat"),
+])
+def test_reads_and_reasoning_select_one_of_the_three_policies(given, policy):
+    assert resolve_options("de2", **given).policy == policy
+
+
+def test_a_call_inherits_what_it_does_not_override():
+    model = resolve_options("de2", policy="direct", reasoning_prob=0.9, reasoning_len=64)
+    assert resolve_options("de2", model) == model
+    eager = resolve_options("de2", model, reasoning=True)  # reasoning reads twice first
+    assert (eager.policy, eager.think_gate, eager.think_budget) == ("repeat-think", 0.9, 64)
+    assert resolve_options("de2", eager, reasoning_len=8) == ReadOptions("de2", "repeat-think", 0.9, 8)
+    assert resolve_options("de1", compound=False).overflow == "error"
+    assert resolve_options("de1", resolve_options("de1", overflow="error"), compound=True).compound
+
+
+@pytest.mark.parametrize("family,given,match", [
+    ("de2", {"reads": "single", "reasoning": True}, "single"),
+    ("de2", {"policy": "direct", "reasoning": True}, "disagrees"),
+    ("de2", {"policy": "repeat-think", "reads": "single"}, "disagrees"),
+    ("de2", {"policy": "twice"}, "unknown policy"),
+    ("de2", {"reads": "triple"}, "reads"),
+    ("de2", {"reasoning": "yes"}, "boolean"),
+    ("de2", {"compound": True}, "compound"),
+    ("de2", {"reasoning_prob": 1.5}, "probability"),
+    ("de2", {"reasoning_len": 0}, "positive integer"),
+    ("de2", {"reasoning_prob": 0.5, "think_gate": 0.6}, "pass one"),
+    ("de2", {"reasoning_len": 8, "think_budget": 16}, "pass one"),
+    ("de1", {"compound": True, "overflow": "error"}, "pass one"),
+    ("de1", {"overflow": "truncate"}, "overflow"),
+    ("de1", {"reads": "double"}, "not defined for de1"),
+    ("de1", {"reasoning": True}, "not defined for de1"),
+])
+def test_a_combination_no_contract_defines_is_an_error(family, given, match):
+    with pytest.raises(ValueError, match=match):
+        resolve_options(family, **given)
+
+
+def test_the_constructor_takes_either_name_for_a_setting():
+    new = DecisionModel(model="de2-x", reasoning_prob=0.5, reasoning_len=64, reads="double", reasoning=False)
+    old = DecisionModel(model="de2-x", think_gate=0.5, think_budget=64, policy="repeat")
+    assert new.options == old.options
+    assert (new.policy, new.reads, new.reasoning) == ("repeat", "double", False)
+    assert (new.think_gate, new.reasoning_prob, new.think_budget, new.reasoning_len) == (0.5, 0.5, 64, 64)
+    strict = DecisionModel(model="shisa-ai/shisa-de-1", compound=False)
+    assert (strict.overflow, strict.compound) == ("error", False)
+    assert DecisionModel(model="shisa-ai/shisa-de-1").compound is True
+    for kwargs in ({"reads": "double"}, {"reasoning": True}):
+        with pytest.raises(ValueError, match="not defined for de1"):
+            DecisionModel(model="shisa-ai/shisa-de-1", **kwargs)
+    with pytest.raises(ValueError, match="compound"):
+        DecisionModel(model="de2-x", compound=True)
+
+
+@pytest.mark.parametrize("override,strategy,calls,repeated", [
+    ({}, "repeat2-think", 3, True),
+    ({"reasoning": False}, "repeat2", 1, True),
+    ({"policy": "repeat"}, "repeat2", 1, True),
+    ({"reads": "single"}, "direct", 1, False),
+    ({"policy": "direct"}, "direct", 1, False),
+    ({"reasoning_prob": 0.2}, "repeat2", 1, True),  # the read clears a lower gate
+])
+def test_one_call_overrides_the_models_read(override, strategy, calls, repeated):
+    server = StubDE2Server(logprob=lambda code: -1.0, thought=[ord("x"), int(ANSWER_TOKEN_ID)])
+    with make_de2_model(server) as model:
+        result = model.decide("state", {"q": wide_choice(3)}, **override)
+        assert result.answers["q"].strategy == strategy and len(server.calls) == calls
+        assert (INPUT_REPEAT in server.calls[0]["prompt"]) is repeated
+        assert result.meta["policy"] == resolve_options("de2", **override).policy
+        assert result.meta["think_gate"] == override.get("reasoning_prob", 0.7)
+        # The override was for that call; the model's default is unchanged.
+        assert model.policy == "repeat-think" and model.think_gate == 0.7
+        server.calls.clear()
+        assert model.classify("state", {"q": ["a", "b", "c"]}).answers["q"].strategy == "repeat2-think"
+
+
+def test_a_call_can_turn_reasoning_on_and_bound_the_thought():
+    server = StubDE2Server(logprob=lambda code: -1.0, thought=[ord("x")] * 20)
+    with make_de2_model(server, policy="direct") as model:
+        assert model.decide("state", {"q": wide_choice(3)}).answers["q"].strategy == "direct"
+        server.calls.clear()
+        result = model.classify("state", {"q": ["a", "b", "c"]}, reasoning=True, reasoning_len=8)
+        answer = result.answers["q"]
+        assert (answer.strategy, answer.thought_tokens) == ("repeat2-think", 8)
+        assert server.calls[1]["max_tokens"] == 8 and result.meta["think_budget"] == 8
+        with pytest.raises(ValueError, match="one logical read"):
+            model.decide("state", {"q": wide_choice(3)}, reasoning=True, probability=True)
+        with pytest.raises(ValueError, match="compound"):
+            model.decide("state", {"q": wide_choice(3)}, compound=True)
+
+
+def test_compound_is_set_per_call_on_de1():
+    calls = []
+    def handler(request):
+        calls.append(request)
+        raise AssertionError("unexpected request")
+    with DecisionModel(readout=make_readout(handler)) as model:
+        with pytest.raises(QuestionError, match="rejects choices above 26"):
+            model.decide("state", {"wide": wide_choice(27)}, compound=False)
+        with pytest.raises(ValueError, match="not defined for de1"):
+            model.decide("state", {"q": Noul("Yes?")}, reasoning=True)
+    assert not calls
+
+
+def test_the_cli_passes_the_read_options_through(capsys):
+    from shisa_de import cli
+
+    args = cli.build_parser().parse_args(
+        ["doctor", "--model", "de2-x", "--no-reasoning", "--reasoning-prob", "0.5", "--reasoning-len", "64"])
+    assert (args.reads, args.reasoning, args.reasoning_prob, args.reasoning_len, args.compound) == (
+        None, False, 0.5, 64, None)
+    with pytest.raises(SystemExit):
+        cli.main(["doctor", "--model", "shisa-ai/shisa-de-1", "--reads", "double"])
+    assert "not defined for de1" in capsys.readouterr().err

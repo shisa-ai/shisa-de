@@ -204,7 +204,8 @@ What to know about these answers:
   quality guarantee.
 - Images and ordered scores cannot go above 26.
 
-Use `DecisionModel(overflow="error")` to reject wide choices instead. The
+Use `compound=False` (or the older `overflow="error"`), on the model or on one
+call, to reject wide choices instead. The
 [overflow section](docs/READOUT.md#13-text-choice-overflow) of the DE-1 readout
 has the algorithm, its cost, and the evidence behind it.
 
@@ -363,17 +364,9 @@ recognizes `de-1` or `de-2` in the model ID or tokenizer name. Anything else is
 treated as DE-2 with a warning, so pass `family="de1"` or `family="de2"` when
 the ID does not say.
 
-**Trade accuracy for speed with `policy=`.** A thinking step takes seconds where
-an ordinary answer takes tens of milliseconds.
-
-| `policy` | What runs | Requests per question |
-| --- | --- | --- |
-| `"repeat-think"` (default) | Shown twice, plus a thinking step when unsure | 1, or 3 when it thinks |
-| `"repeat"` | Shown twice | 1 |
-| `"direct"` | Shown once, as DE-1 is | 1, with about half the prompt tokens |
-
-`think_gate=` and `think_budget=` move the 0.7 threshold and the 1,024-token
-limit. Choices above 128 options cost one extra request.
+**Trade accuracy for speed** with the [read settings](#read-settings): a
+thinking step takes seconds where an ordinary answer takes tens of milliseconds.
+Choices above 128 options cost one extra request.
 
 **Serving DE-2 with vLLM:**
 
@@ -388,6 +381,59 @@ limit. Choices above 128 options cost one extra request.
 The [DE-2 readout](docs/READOUT-DE2.md) has the exact prompts and requests, the
 measured costs, and the server command they were measured on.
 
+## Read settings
+
+Each family has a default way of reading a question. You can change it for a
+model, or for one call.
+
+| Setting | What it does | DE-2 default | DE-1 default |
+| --- | --- | --- | --- |
+| `reads` | `"single"` or `"double"`: how often the question is shown in the prompt | `"double"` | `"single"` (fixed) |
+| `reasoning` | Think when the answer is unsure, then answer again | `True` | `False` (fixed) |
+| `reasoning_prob` | Think when the top probability is below this | `0.7` | not used |
+| `reasoning_len` | The most tokens a thinking step may run to | `1024` | not used |
+| `compound` | Read a text choice above 26 options in two rounds ([large label sets](#large-label-sets)) | not used | `True` |
+
+Set them on the model to change its default, or on a call to change that call:
+
+```python
+# Model default: never think.
+de = DecisionModel.from_endpoint(url, model="my-checkpoint", family="de2", reasoning=False)
+
+de.classify(state, labels)                           # shown twice, no thinking
+de.classify(state, labels, reads="single")           # this call only: fastest
+de.decide(state, questions, reasoning=True,          # this call only: think sooner,
+          reasoning_prob=0.9, reasoning_len=256)     # for fewer tokens
+```
+
+A call inherits whatever it does not set. `result.meta` records the policy,
+gate, and budget that call ran under, and each answer's `strategy` says whether
+it actually thought.
+
+**Fastest or best.** On DE-2 the three combinations are also named, as `policy=`:
+
+| Goal | Settings | `policy` | Requests per question |
+| --- | --- | --- | --- |
+| Best quality (default) | `reads="double", reasoning=True` | `"repeat-think"` | 1, or 3 when it thinks |
+| Balanced | `reasoning=False` | `"repeat"` | 1 |
+| Lowest latency | `reads="single"` | `"direct"` | 1, with about half the prompt tokens |
+
+DE-1 has one read, so there is nothing to trade: `compound=False` only makes
+choices above 26 options an error instead of a two-round read.
+
+Things to know:
+
+- `reasoning=True` always shows the question twice first, and `reads="single"`
+  never thinks. Asking for both at once is an error.
+- Questions above 26 options never think, and neither does a call made with
+  `probability=True`.
+- Settings a family does not have raise `ValueError`: a double read or reasoning
+  on DE-1, and `compound=True` on DE-2 (it reads up to 256 options in one
+  question).
+- The older names still work and mean the same thing: `think_gate` is
+  `reasoning_prob`, `think_budget` is `reasoning_len`, and
+  `overflow="finalist-top1"` / `"error"` is `compound=True` / `False`.
+
 ## Command line
 
 | Command | What it does |
@@ -399,6 +445,9 @@ measured costs, and the server command they were measured on.
 
 All of them accept `--base-url`, `--model`, `--tokenizer`, `--family`,
 `--policy`, and `--calibration` (a family name or a path to a calibration file).
+The [read settings](#read-settings) are `--reads`, `--reasoning` /
+`--no-reasoning`, `--reasoning-prob`, `--reasoning-len`, and `--compound` /
+`--no-compound`.
 
 ## How it works
 

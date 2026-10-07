@@ -58,6 +58,13 @@ question (checked 2026-10-05).
 | `repeat` | 1 to 3 | `repeat2` |
 | `direct` | The one-pass scaffold, then 2 and 3 | `direct` |
 
+The same three reads can be named a part at a time: `reads="single"` is
+`direct`, `reads="double"` with `reasoning=False` is `repeat`, and
+`reads="double"` with `reasoning=True` is `repeat-think`. These are other names
+for the policies above, not further reads; a single read followed by a thought
+is not defined and raises `ValueError`. Any of them, and `policy`, can be passed
+to `DecisionModel` as the model's default or to one `classify` / `decide` call.
+
 The research repository adopted `repeat-think` on 2026-10-04. On its
 9,888-question Decision Index sample the policy scored 72.94% against 70.23% for
 one pass (+2.71 points, standard error 0.30), with 7.0% of questions thinking.
@@ -225,7 +232,8 @@ read per question, so the repeated read's distribution is the answer and
 one read covers every option.
 
 `DecisionModel(think_gate=..., think_budget=...)` change the gate and the
-budget. The option cap is fixed. The research notes report no gain from thinking
+budget; `reasoning_prob` and `reasoning_len` are the same two settings, and both
+can also be passed to one `classify` / `decide` call. The option cap is fixed. The research notes report no gain from thinking
 above 26 options or from budgets above 1,024.
 
 **The thought.** Render the question once, not twice, with thinking on and this
@@ -298,7 +306,7 @@ conditional on finalists, because nothing was eliminated.
 | `result.raw[head]["thought"]` | The thought's text, with `debug=True` |
 | `result.usage["thought_tokens"]` | Thought tokens across the call |
 | `result.usage["output_tokens"]` | Logical reads plus thought tokens; an estimate, not server billing |
-| `result.meta` | `family`, `readout_version`, `policy` (the one that ran), `probability`, `think_gate`, `think_budget`, `think_option_cap` |
+| `result.meta` | `family`, `readout_version`, `policy` (the one that ran), `probability`, `think_gate`, `think_budget`, `think_option_cap`; the values the call ran under, after any per-call override |
 
 ## 6. Images
 
