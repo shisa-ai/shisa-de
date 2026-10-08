@@ -21,6 +21,7 @@ class FakeReadout:
 def engine():
     result = ShisaDE2Engine.__new__(ShisaDE2Engine)
     result.max_tokens = 10
+    result.repeat = 2
     calls = []
 
     def decide(state, questions, **kwargs):

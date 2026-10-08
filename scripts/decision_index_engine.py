@@ -3,8 +3,8 @@
 Requires the separately installed, pinned Decision Index reproduction kit.
 Run with ``--engine scripts.decision_index_engine:ShisaDE2Engine``. Use the
 upstream runner's ``--compact`` flag to keep benchmark text out of results.
-``--option policy=repeat`` reads twice and never thinks; the default is the
-adaptive ``repeat-think``.
+``--option policy=repeat`` reads twice and never thinks, ``policy=direct`` reads
+once; the default is the adaptive ``repeat-think``.
 """
 from __future__ import annotations
 
@@ -37,8 +37,9 @@ class ShisaDE2Engine(Engine):
         super().__init__()
         if not base_url.startswith(("http://127.0.0.1:", "http://localhost:")):
             raise ValueError("This benchmark engine requires an explicit local endpoint")
-        if policy not in ("repeat", "repeat-think"):
-            raise ValueError("policy must be 'repeat' or 'repeat-think'")
+        if policy not in ("direct", "repeat", "repeat-think"):
+            raise ValueError("policy must be 'direct', 'repeat' or 'repeat-think'")
+        self.repeat = 1 if policy == "direct" else 2
         thinks = policy == "repeat-think"
         self.max_tokens = int(max_tokens)
         if self.max_tokens < 2:
@@ -77,12 +78,12 @@ class ShisaDE2Engine(Engine):
                 typed[key] = Noul(q["instructions"], q.get("criteria"))
             else:
                 raise Unsupported(f"Unsupported question type: {q['type']}")
-        # Validate all repeated prompts before any head sends a request. Never
+        # Validate every prompt as it will be sent before any request. Never
         # shorten the state, option list, or number of repetitions to fit.
         readout = self.model.readout
         tokenizer = readout.ensure_tokenizer()
         for question in typed.values():
-            prompt = readout.render(state, question, repeat=2, max_options=MAX_CODES)
+            prompt = readout.render(state, question, repeat=self.repeat, max_options=MAX_CODES)
             count = len(tokenizer.encode(prompt, add_special_tokens=False))
             if count + 1 > self.max_tokens:
                 raise Unsupported(f"Context window: {count} prompt tokens plus answer exceeds {self.max_tokens}")
