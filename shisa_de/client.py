@@ -41,7 +41,7 @@ from .policy import THINK_OPTION_CAP, PolicyRead, ReadOptions, read_policy, reso
 from .readout import MAX_CODES, READOUT_VERSIONS, LetterRead, Readout, ReadoutError, codes_for
 
 DEFAULT_ENDPOINT = "https://api.shisa.ai/openai"
-DEFAULT_MODEL = "shisa-ai/shisa-de-1"
+DEFAULT_MODEL = "shisa-ai/shisa-de-2"
 ENDPOINT_ENV = "SHISA_DE_ENDPOINT"
 API_KEY_ENVS = ("SHISA_DE_API_KEY", "SHISA_API_KEY")
 
@@ -321,7 +321,7 @@ class DecisionModel:
         self.base_url = (base_url or os.environ.get(ENDPOINT_ENV) or DEFAULT_ENDPOINT).rstrip("/")
         if self.base_url.endswith("/v1"):
             self.base_url = self.base_url[:-3]
-        self.model = model or DEFAULT_MODEL
+        self.model = model or getattr(readout, "model", DEFAULT_MODEL)
         # The family picks the contract: the readout version, the policy, the
         # option limit and the calibration record. It is resolved once, here, and
         # its source is kept so an assumption is never presented as a detection.

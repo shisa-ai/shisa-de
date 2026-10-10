@@ -4,7 +4,7 @@
     SHISA_DE_LIVE=1 SHISA_DE_ENDPOINT=http://127.0.0.1:8021 SHISA_DE_MODEL=de2-v4-lr5e5-e3-s7 \
         SHISA_DE_TOKENIZER=google/gemma-4-26B-A4B-it python -m pytest tests/test_live.py -v
 
-The default is hosted DE-1, which needs SHISA_API_KEY. `SHISA_DE_MODEL` and
+The default is Shisa API DE-2, which needs SHISA_API_KEY. `SHISA_DE_MODEL` and
 `SHISA_DE_TOKENIZER` point the suite at another served model; tests that assert
 one family's contract skip on the other. These tests spend real requests, so
 they stay out of the default run.

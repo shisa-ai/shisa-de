@@ -1,5 +1,20 @@
 # Changelog
 
+## 0.5.0
+
+Make DE-2 the default model on Shisa API and standardize the service name in
+package metadata and user documentation.
+
+- Default `DecisionModel` and CLI usage to `shisa-ai/shisa-de-2` at
+  `https://api.shisa.ai/openai`; explicit DE-1 and endpoint overrides remain
+  supported.
+- Add the Decision Index runner and document the measured direct, repeat, and
+  repeat-think runs.
+- Update offline fixtures to declare the DE-1 or DE-2 contract they exercise.
+
+The DE-1 and DE-2 readout versions are unchanged; this release changes the
+hosted default and release documentation, not either answer-producing contract.
+
 ## 0.4.0
 
 Read settings by part, per model and per call, and a first DE-2 calibration.

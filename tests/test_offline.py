@@ -20,7 +20,7 @@ from types import SimpleNamespace
 import httpx
 import pytest
 
-from shisa_de import Choice, DecisionModel, Noul, Readout, ReadoutError, Score, softmax
+from shisa_de import Choice, DEFAULT_MODEL, DecisionModel, Noul, Readout, ReadoutError, Score, softmax
 from shisa_de.calibration import (
     CALIBRATION_FILES,
     Calibration,
@@ -71,7 +71,7 @@ class StubTokenizer:
 
 
 def make_readout(handler, **kwargs) -> Readout:
-    readout = Readout(base_url="http://test.local", model="test-model", **kwargs)
+    readout = Readout(base_url="http://test.local", model="shisa-ai/shisa-de-1", **kwargs)
     readout._client = httpx.Client(base_url="http://test.local", transport=httpx.MockTransport(handler))
     readout._tokenizer = StubTokenizer()
     return readout
@@ -284,7 +284,7 @@ def test_multi_question_first_call_loads_tokenizer_once(monkeypatch, method):
     transport = httpx.MockTransport(
         lambda request: httpx.Response(200, json=top_logprobs({"A": -0.1, "B": -3.0}))
     )
-    with DecisionModel(transport=transport) as model:
+    with DecisionModel(model="shisa-ai/shisa-de-1", family="de1", transport=transport) as model:
         result = getattr(model, method)("state", {
             "route": Choice("Choose a route", {"a": None, "b": None}),
             "urgent": Noul("Is this urgent?"),
@@ -308,19 +308,23 @@ def test_hosted_defaults_and_api_key_precedence(monkeypatch, constructor, key_so
         monkeypatch.setenv("SHISA_DE_API_KEY", "de-key")
     if key_source == "explicit":
         kwargs["api_key"] = "explicit-key"
+    expected_model = DEFAULT_MODEL
+    de2_server = StubDE2Server()
     calls = []
 
     def handler(request):
         calls.append(request)
         assert str(request.url) == "https://api.shisa.ai/openai/v1/completions"
         assert request.headers["Authorization"] == f"Bearer {key_source}-key"
-        assert json.loads(request.content)["model"] == "shisa-ai/shisa-de-1"
+        assert json.loads(request.content)["model"] == expected_model
+        if expected_model == "shisa-ai/shisa-de-2":
+            return de2_server(request)
         return httpx.Response(200, json=top_logprobs({"A": -0.1, "B": -3.0}))
 
     with constructor(transport=httpx.MockTransport(handler), **kwargs) as model:
         assert model.readout._tokenizer is None
-        assert model.readout.tokenizer_source == "shisa-ai/shisa-de-1"
-        model.readout._tokenizer = StubTokenizer()
+        assert model.readout.tokenizer_source == expected_model
+        model.readout._tokenizer = de2_server.tokenizer
         result = model.classify("Win a prize!", {"intent": ["spam", "ham"]})
         assert result["intent"] == "spam"
     assert len(calls) == 1
@@ -402,7 +406,7 @@ def test_cli_ask_uses_the_supplied_prompt(monkeypatch, capsys):
         assert payload["criterion"] == "Is this spam?"
         return httpx.Response(200, json=top_logprobs({"A": -0.1, "B": -3.0}))
 
-    model = DecisionModel(transport=httpx.MockTransport(handler))
+    model = DecisionModel(model="shisa-ai/shisa-de-1", family="de1", transport=httpx.MockTransport(handler))
     model.readout._tokenizer = StubTokenizer()
     monkeypatch.setattr(cli, "DecisionModel", lambda **kwargs: model)
     assert cli.main(["ask", "--state", "prize", "--labels", "spam,ham",
@@ -418,7 +422,7 @@ def test_cli_explain_curl_uses_environment_references_not_secrets(monkeypatch, c
     monkeypatch.delenv("SHISA_DE_API_KEY", raising=False)
     if authenticated:
         monkeypatch.setenv("SHISA_API_KEY", "secret-not-for-output")
-    model = DecisionModel(transport=httpx.MockTransport(
+    model = DecisionModel(model="shisa-ai/shisa-de-1", family="de1", transport=httpx.MockTransport(
         lambda request: httpx.Response(200, json=top_logprobs({"A": -0.1, "B": -3.0}))
     ))
     model.readout._tokenizer = StubTokenizer()
@@ -772,7 +776,7 @@ def test_the_image_request_matches_the_probed_shape():
     assert len(calls) == 1
     path, body = calls[0]
     assert path == "/v1/chat/completions"
-    assert body["model"] == "test-model"
+    assert body["model"] == "shisa-ai/shisa-de-1"
     assert body["max_tokens"] == 1
     assert body["temperature"] == 0
     assert body["logprobs"] is True
@@ -1015,6 +1019,7 @@ class FakeReadout:
     """Returns a distribution that favours a chosen letter, and counts calls."""
 
     def __init__(self, favourite: dict[str, str] | None = None, noul: float = 0.9) -> None:
+        self.model = "shisa-ai/shisa-de-1"
         self.favourite = favourite or {}
         self.noul = noul
         self.calls: list[str] = []
@@ -1280,7 +1285,7 @@ def test_health_passes_for_the_default_de1_model():
     def handler(request):
         return httpx.Response(200, json={"data": [{"id": "shisa-ai/shisa-de-1"}]})
 
-    with DecisionModel(base_url="http://test.local", transport=httpx.MockTransport(handler)) as model:
+    with DecisionModel(base_url="http://test.local", model="shisa-ai/shisa-de-1", transport=httpx.MockTransport(handler)) as model:
         model.readout._tokenizer = StubTokenizer()
         report = model.health()
     assert report["readout_version"] == READOUT_VERSION
@@ -1675,6 +1680,7 @@ def test_overflow_replays_measured_component_distributions():
     for case in fixture["cases"]:
         class Replay:
             def __init__(self):
+                self.model = "shisa-ai/shisa-de-1"
                 self.index = 0
             def evaluate(self, state, question, debug=False):
                 assert state == case["state"]

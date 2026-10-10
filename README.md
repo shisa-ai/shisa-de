@@ -7,11 +7,10 @@ Give it text, images, or structured data and a set of labels or questions. It
 returns answers, probabilities, and request usage, not generated prose. The
 client loads only a tokenizer; model weights stay on the server.
 
-- **DE-1** is available on the hosted [Shisa Platform](https://platform.shisa.ai/)
-  or from your own OpenAI-compatible server.
-- **DE-2** is [`shisa-ai/shisa-de-2`](https://huggingface.co/shisa-ai/shisa-de-2)
-  on Hugging Face, served from your own OpenAI-compatible server; see
-  [Use DE-2](#use-de-2).
+- **DE-1** is available from your own OpenAI-compatible server.
+- **DE-2** is the default on [Shisa API](https://platform.shisa.ai/) and is also
+  available as [`shisa-ai/shisa-de-2`](https://huggingface.co/shisa-ai/shisa-de-2)
+  from your own OpenAI-compatible server; see [Use DE-2](#use-de-2).
 
 ## Benchmark snapshot
 
@@ -34,7 +33,7 @@ Release notes are in [CHANGELOG.md](CHANGELOG.md).
 
 ## Quick start
 
-Get an API key from [platform.shisa.ai](https://platform.shisa.ai/) and set it in
+Get an API key from [Shisa API](https://platform.shisa.ai/) and set it in
 your environment:
 
 ```bash
@@ -54,7 +53,7 @@ with DecisionModel() as de:
     print(result["intent"])  # spam
 ```
 
-The defaults are model `shisa-ai/shisa-de-1` at `https://api.shisa.ai/openai`.
+The defaults are model `shisa-ai/shisa-de-2` at `https://api.shisa.ai/openai`.
 The tokenizer is downloaded from Hugging Face on the first call, not at import.
 The client needs neither PyTorch nor a GPU.
 
@@ -316,7 +315,7 @@ shisa-de ask --state 'Please refund my duplicate payment.' --labels refund_reque
 | --- | --- |
 | Endpoint | `base_url=` / `--base-url`, then `SHISA_DE_ENDPOINT`, then the hosted default |
 | API key | `api_key=`, then `SHISA_DE_API_KEY`, then `SHISA_API_KEY` |
-| Model | `model=` / `--model`, otherwise `shisa-ai/shisa-de-1` |
+| Model | `model=` / `--model`, otherwise `shisa-ai/shisa-de-2` |
 | Tokenizer | `tokenizer=` / `--tokenizer`, otherwise the model ID |
 | Model family | `family=` / `--family`, then `de-1` or `de-2` in the model ID, then in the tokenizer name, otherwise DE-2 with a warning |
 
@@ -325,7 +324,8 @@ environment are sent to local endpoints too.
 
 ## Use DE-2
 
-The same `classify` and `decide` calls work against DE-2. Serve it with
+The same `classify` and `decide` calls work against DE-2. On Shisa API, it is the
+default model; you can also serve it yourself with
 `vllm serve shisa-ai/shisa-de-2` and point the client at it.
 The client asks DE-2 differently from DE-1, the way DE-2 was built to be asked:
 
