@@ -35,17 +35,25 @@ The first successful upload creates the PyPI project.
 
    Replace `0.1.0` with the version being released.
 
-5. Open [Publish to PyPI](https://github.com/shisa-ai/shisa-de/actions/workflows/publish.yml).
+5. Create the GitHub release for the tag:
+
+   ```bash
+   gh release create v0.1.0 --title "v0.1.0" --generate-notes
+   ```
+
+6. Open [Publish to PyPI](https://github.com/shisa-ai/shisa-de/actions/workflows/publish.yml).
    The build checks version consistency, runs tests, builds and checks both
    distributions, and smoke-tests the installed wheel and tokenizer.
-6. Once the build passes, review the run and approve the `pypi-publish` deployment.
-7. Verify the published install:
+7. Once the build passes, review the run and approve the `pypi-publish` deployment.
+8. Verify the published install:
 
    ```bash
    uvx --refresh --from 'shisa-de==0.1.0' shisa-de --help
    ```
 
-8. Check that <https://pypi.org/project/shisa-de/> shows the released version.
+9. Check that <https://pypi.org/project/shisa-de/> shows the released version.
+   Check that <https://github.com/shisa-ai/shisa-de/releases> shows the
+   corresponding GitHub release.
 
 PyPI does not allow replacing uploaded distribution files. Release a new
 version for fixes; do not move a published version tag.
