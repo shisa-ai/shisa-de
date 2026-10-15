@@ -70,6 +70,9 @@ def _common(parser: argparse.ArgumentParser) -> None:
                         help=f"the most tokens a thought may run to (default: {THINK_BUDGET})")
     parser.add_argument("--compound", default=None, action=argparse.BooleanOptionalAction,
                         help="read a de1 choice above 26 options in two rounds. Default: on for de1")
+    parser.add_argument("--strip-state-quotes", action="store_true",
+                        help="remove delimiter quote characters from the edges of each state string "
+                             "before rendering. Default: off, the state renders verbatim")
     parser.add_argument("--timeout", type=float, default=120.0)
 
 
@@ -112,6 +115,7 @@ def main(argv: list[str] | None = None) -> int:
             calibration=resolve_calibration(args.calibration),
             family=args.family, policy=args.policy, reads=args.reads, reasoning=args.reasoning,
             reasoning_prob=args.reasoning_prob, reasoning_len=args.reasoning_len, compound=args.compound,
+            strip_state_quotes=args.strip_state_quotes,
         )
     except ValueError as exc:
         parser.error(str(exc))

@@ -55,8 +55,9 @@ from .readout import (
     codes_for,
     softmax,
 )
+from .state import QUOTE_DELIMITERS, strip_quote_delimiters
 
-__version__ = "0.5.0"
+__version__ = "0.5.1"
 
 __all__ = [
     "Answer",
@@ -78,6 +79,7 @@ __all__ = [
     "MAX_OPTIONS",
     "POLICIES",
     "PolicyRead",
+    "QUOTE_DELIMITERS",
     "Noul",
     "Question",
     "QuestionError",
@@ -106,6 +108,7 @@ __all__ = [
     "resolve_options",
     "resolve_calibration",
     "softmax",
+    "strip_quote_delimiters",
     "temper_binary",
     "temper_distribution",
 ]

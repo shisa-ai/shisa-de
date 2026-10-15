@@ -1,5 +1,27 @@
 # Changelog
 
+## 0.5.1
+
+Add an opt-in state normalization for quote delimiters. The readout versions,
+the prompts the client sends, the requests, and the bundled calibration are
+unchanged, and the normalization is off by default.
+
+- Add `strip_state_quotes=False` to `DecisionModel` and
+  `--strip-state-quotes` to the CLI. When set, delimiter quote characters are
+  removed from the edges of state strings before the prompt is rendered, so
+  `"text"`, `"text`, `text"`, `""text` and `text""` all embed as `text` while
+  interior quoting such as `He said "hi"` is kept. Measured through this client
+  against `shisa-ai/shisa-de-2` on Shisa API on 2026-10-15, three reads per
+  variant: the bare text `What are my balances currently?` and the quoted
+  `"What are my balances currently?"` were classified differently in every
+  read, and a stray trailing quote moved the answer further than a stray
+  leading one. Brackets, braces and parentheses did not move it.
+- Export `strip_quote_delimiters` and `QUOTE_DELIMITERS` for callers that render
+  prompts themselves, and add the same option to the DE-2 trainer's renderer in
+  the training repository.
+- Record the setting in `result.meta` and in the request configuration, so
+  answers read with it are not compared with answers read without it.
+
 ## 0.5.0
 
 Make DE-2 the default model on Shisa API and standardize the service name in

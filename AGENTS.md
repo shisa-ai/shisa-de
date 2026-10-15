@@ -74,6 +74,7 @@ What must not change casually:
 | `shisa_de/client.py` | `DecisionModel.classify`, `DecisionModel.decide`, `health`, `Decision`, `Answer` |
 | `shisa_de/overflow.py` | Balanced chunks, top-one finalists, conditional score maps; DE-1 text choices only |
 | `shisa_de/questions.py` | `Noul`, `Choice`, `Score` and their wire shapes |
+| `shisa_de/state.py` | `strip_quote_delimiters`, the opt-in removal of quote delimiters at a state string's edges |
 | `shisa_de/calibration.py` | Temperature scaling, the confidence statistic, record selection, and `Calibration.applicability` |
 | `shisa_de/family.py` | Resolves DE-1/DE-2 from a declaration, the model id or the tokenizer, and says which |
 | `shisa_de/data/calibration.json` | Fitted DE-1 temperatures with their provenance |

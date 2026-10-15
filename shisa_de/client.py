@@ -289,6 +289,13 @@ class DecisionModel:
     compound on. A combination a family's contract does not define (a double
     read or reasoning on DE-1, compound on DE-2, reasoning after a single read)
     raises `ValueError`.
+
+    ``strip_state_quotes`` is not a read setting: it removes delimiter quote
+    characters from the edges of each state string before the prompt is
+    rendered, so ``"text"``, ``"text`` and ``text"`` reach the model as
+    ``text`` while interior quoting is kept. It is off by default, because the
+    readout contract renders the state verbatim and removing characters changes
+    answers for quote-bearing states.
     """
 
     def __init__(
@@ -315,6 +322,7 @@ class DecisionModel:
         reasoning_prob: float | None = None,
         reasoning_len: int | None = None,
         compound: bool | None = None,
+        strip_state_quotes: bool = False,
         transport: httpx.BaseTransport | None = None,
         readout: Readout | None = None,
     ) -> None:
@@ -375,8 +383,12 @@ class DecisionModel:
                 timeout=timeout,
                 max_logprobs=max_logprobs,
                 api_key=api_key if api_key is not None else _api_key_from_env(),
+                strip_state_quotes=strip_state_quotes,
                 transport=transport,
             )
+        # The readout owns the rendering, so when one is supplied its setting is
+        # the one that applies.
+        self.strip_state_quotes = bool(getattr(self.readout, "strip_state_quotes", strip_state_quotes))
 
     # -- the model's default read ------------------------------------------
 
@@ -464,6 +476,7 @@ class DecisionModel:
             "reads": self.reads,
             "reasoning": self.reasoning,
             "compound": self.compound,
+            "strip_state_quotes": self.strip_state_quotes,
             "calibration": self.calibration.id,
             "calibration_model": self.calibration.model,
             "calibration_readout_version": self.calibration.readout_version,
@@ -822,6 +835,7 @@ class DecisionModel:
             "policy": policy,
             "probability": probability,
             "input_type": "image" if image_url is not None else "text",
+            "strip_state_quotes": self.strip_state_quotes,
             "calibration": self.calibration.id,
             "calibrated": next(iter(flags)) if len(flags) == 1 else (None if flags else calibrated),
             "calibration_by_head": {head: answer.calibrated for head, answer in decision.answers.items()},

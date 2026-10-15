@@ -454,6 +454,42 @@ Things to know:
   `reasoning_prob`, `think_budget` is `reasoning_len`, and
   `overflow="finalist-top1"` / `"error"` is `compound=True` / `False`.
 
+### Quote delimiters in the state
+
+The state is embedded in the prompt verbatim, and a quote character at the start
+or end of a state string reads as content. Measured through this client against
+`shisa-ai/shisa-de-2` on Shisa API on 2026-10-15, three reads per variant:
+`What are my balances currently?` and `"What are my balances currently?"` were
+classified differently in every read, and a stray trailing quote moved the
+answer further than a stray leading one. Brackets, braces and parentheses at the
+same positions did not move it, and edge quotes are rare in the training states,
+so this reads as a base-model prior rather than a DE-2 habit.
+
+| Setting | What it does |
+| --- | --- |
+| `strip_state_quotes=True` | Remove delimiter quote characters from the edges of state strings before rendering. Default: off |
+| `--strip-state-quotes` | The same setting for `shisa-de doctor`, `ask` and `explain` |
+
+`"text"`, `"text`, `text"`, `""text` and `text""` all reach the model as
+`text`, while interior quoting such as `He said "hi"` is kept. The delimiters
+are the ASCII and curly single and double quotes and the backtick; other
+punctuation is left alone.
+
+```python
+de.classify({"message": '"What are my balances currently?"'}, labels,
+            strip_state_quotes=True)
+```
+
+It is off by default, because the readout contract renders the state verbatim,
+removing characters changes answers for quote-bearing states (boolq's LaTeX,
+ag_news headlines), and only you know whether a delimiter carries meaning for
+your task. `result.meta["strip_state_quotes"]` records what a call ran under,
+and the setting is part of the request configuration, so answers read with it
+are not comparable with answers read without it.
+
+If you render prompts yourself instead of through the client, apply the same
+rule there; the package exports `strip_quote_delimiters` for that.
+
 ## Command line
 
 | Command | What it does |
@@ -464,7 +500,8 @@ Things to know:
 | `shisa-de explain` | Prints the prompt, the answer tokens, the logprobs, and the final distribution for one question |
 
 All of them accept `--base-url`, `--model`, `--tokenizer`, `--family`,
-`--policy`, and `--calibration` (a family name or a path to a calibration file).
+`--policy`, `--calibration` (a family name or a path to a calibration file), and
+`--strip-state-quotes`.
 The [read settings](#read-settings) are `--reads`, `--reasoning` /
 `--no-reasoning`, `--reasoning-prob`, `--reasoning-len`, and `--compound` /
 `--no-compound`.

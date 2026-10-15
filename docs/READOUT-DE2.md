@@ -497,6 +497,22 @@ def ask(state, criterion, options, base_url="http://127.0.0.1:8021"):
     return options[codes.index(best)], probabilities
 ```
 
+The state is rendered verbatim, as the contract specifies. A quote character at
+the start or end of a state string is read as content: measured through the SDK
+against `shisa-ai/shisa-de-2` on Shisa API on 2026-10-15, three reads per
+variant, the bare text `What are my balances currently?` and the quoted `"What
+are my balances currently?"` were classified differently in every read, and a
+stray trailing quote moved the answer further than a stray leading one.
+Brackets, braces and parentheses at the same positions did not move it.
+
+The SDK can remove those delimiters before serialization with
+`strip_state_quotes=True` (`--strip-state-quotes` on the CLI), which renders
+`"text"`, `"text`, `text"`, `""text` and `text""` as `text` while keeping
+interior quoting. It is off by default, so the client matches the reference
+implementation above unless a caller asks for it. A caller that renders prompts
+itself can apply `shisa_de.strip_quote_delimiters` to the state for the same
+result.
+
 ## 11. Verification
 
 ```bash

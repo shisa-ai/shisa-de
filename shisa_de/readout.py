@@ -51,6 +51,7 @@ import httpx
 
 from .images import validate_image_url
 from .questions import MAX_OPTIONS, Question, QuestionError
+from .state import strip_quote_delimiters
 
 LETTERS = "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
 
@@ -221,6 +222,7 @@ class Readout:
         system_prompt: str = DIRECT_SYSTEM,
         max_logprobs: int = 20,
         api_key: str | None = None,
+        strip_state_quotes: bool = False,
         transport: httpx.BaseTransport | None = None,
     ) -> None:
         self.base_url = base_url.rstrip("/")
@@ -230,6 +232,9 @@ class Readout:
         self.local_files_only = local_files_only
         self.system_prompt = system_prompt
         self.max_logprobs = max_logprobs
+        # Off by default: the state renders verbatim unless the caller asks for
+        # the delimiter strip (see `shisa_de.state`).
+        self.strip_state_quotes = bool(strip_state_quotes)
         self._tokenizer = None
         self._slot_cache: dict[str, Slot] = {}
         self._boundary_checked: set[str] = set()
@@ -312,11 +317,16 @@ class Readout:
         Both readouts send this same object. The text readout renders it into the
         prompt itself; the image readout sends it as the text part beside the
         image and lets the server render.
+
+        With `strip_state_quotes` set, delimiter quote characters are removed
+        from the edges of each state string first, so `"text"`, `"text` and
+        `text"` all embed as `text` while interior quoting is kept; by default
+        the state is embedded verbatim.
         """
         question.validate(max_options)
         options = question.options()
         payload = {
-            "evidence": state,
+            "evidence": strip_quote_delimiters(state) if self.strip_state_quotes else state,
             "criterion": question.instructions,
             "options": [
                 {"letter": code, "description": description}

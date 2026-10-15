@@ -21,6 +21,7 @@ import httpx
 import pytest
 
 from shisa_de import Choice, DEFAULT_MODEL, DecisionModel, Noul, Readout, ReadoutError, Score, softmax
+from shisa_de import strip_quote_delimiters
 from shisa_de.calibration import (
     CALIBRATION_FILES,
     Calibration,
@@ -414,6 +415,30 @@ def test_cli_ask_uses_the_supplied_prompt(monkeypatch, capsys):
     assert json.loads(capsys.readouterr().out) == {"intent": "spam"}
 
 
+def test_cli_strip_state_quotes_flag_reaches_the_prompt(monkeypatch, capsys):
+    from shisa_de import cli
+
+    seen: list = []
+
+    def handler(request):
+        prompt = json.loads(request.content)["prompt"]
+        seen.append(json.loads(prompt.split("<user>", 1)[1].split("<model>")[0])["evidence"])
+        return httpx.Response(200, json=top_logprobs({"A": -0.1, "B": -3.0}))
+
+    def build(**kwargs):
+        kwargs.pop("model", None)
+        kwargs.pop("family", None)
+        model = DecisionModel(model="shisa-ai/shisa-de-1", family="de1",
+                              transport=httpx.MockTransport(handler), **kwargs)
+        model.readout._tokenizer = StubTokenizer()
+        return model
+
+    monkeypatch.setattr(cli, "DecisionModel", build)
+    assert cli.main(["ask", "--state", '"prize"', "--labels", "spam,ham"]) == 0
+    assert cli.main(["ask", "--state", '"prize"', "--labels", "spam,ham", "--strip-state-quotes"]) == 0
+    assert seen == ['"prize"', "prize"]
+
+
 @pytest.mark.parametrize("authenticated", [False, True])
 def test_cli_explain_curl_uses_environment_references_not_secrets(monkeypatch, capsys, authenticated):
     from shisa_de import cli
@@ -520,6 +545,69 @@ def test_prompt_carries_the_state_the_question_and_lettered_options():
         {"letter": "B", "description": "Delivery"},
     ]
     assert "only its uppercase letter" in prompt
+
+
+def test_strip_quote_delimiters_removes_a_wrapping_pair_or_an_unmatched_edge():
+    assert strip_quote_delimiters('"What are my balances currently?"') == "What are my balances currently?"
+    assert strip_quote_delimiters('"What are my balances currently?') == "What are my balances currently?"
+    assert strip_quote_delimiters('What are my balances currently?"') == "What are my balances currently?"
+    assert strip_quote_delimiters('""What are my balances currently?') == "What are my balances currently?"
+    assert strip_quote_delimiters('What are my balances currently?""') == "What are my balances currently?"
+    assert strip_quote_delimiters('""quoted""') == "quoted"
+    assert strip_quote_delimiters("`quoted`") == "quoted"
+    assert strip_quote_delimiters("\u201cquoted\u201d") == "quoted"
+    assert strip_quote_delimiters("'quoted'") == "quoted"
+    assert strip_quote_delimiters('"') == ""
+    assert strip_quote_delimiters('""') == ""
+
+
+def test_strip_quote_delimiters_keeps_interior_quoting():
+    assert strip_quote_delimiters('He said "hi"') == 'He said "hi"'
+    assert strip_quote_delimiters('"a" and "b"') == '"a" and "b"'
+    assert strip_quote_delimiters('"quoted" text') == '"quoted" text'
+    assert strip_quote_delimiters('\'He said "hi"\'') == 'He said "hi"'
+    assert strip_quote_delimiters('"text\'') == "text"
+    assert strip_quote_delimiters('mid"dle') == 'mid"dle'
+    assert strip_quote_delimiters("") == ""
+    assert strip_quote_delimiters(3) == 3
+    assert strip_quote_delimiters(None) is None
+
+
+def test_strip_quote_delimiters_walks_mappings_and_sequences():
+    state = {"message": '"hi"', "meta": {"note": "'ok'"}, "tags": ['"a"', 2], "keep": 'mid"dle'}
+    assert strip_quote_delimiters(state) == {
+        "message": "hi", "meta": {"note": "ok"}, "tags": ["a", 2], "keep": 'mid"dle'}
+
+
+def test_the_prompt_renders_the_state_verbatim_by_default():
+    readout = make_readout(lambda request: httpx.Response(200, json=top_logprobs({"A": -0.1, "B": -3.0})))
+    prompt = readout.render({"message": '"late"'}, Choice("Which queue?", {"billing": None, "logistics": "Delivery"}))
+    payload = json.loads(prompt.split("<user>", 1)[1].split("<model>")[0])
+    assert payload["evidence"] == {"message": '"late"'}
+
+
+def test_strip_state_quotes_renders_the_state_without_its_delimiters():
+    question = Choice("Which queue?", {"billing": None, "logistics": "Delivery"})
+    handler = lambda request: httpx.Response(200, json=top_logprobs({"A": -0.1, "B": -3.0}))
+    bare = make_readout(handler).render({"message": "late"}, question)
+    quoted = make_readout(handler, strip_state_quotes=True).render({"message": '"late"'}, question)
+    assert quoted == bare
+
+
+def test_the_model_reports_the_state_normalization_it_renders_with():
+    def handler(request):
+        if request.url.path == "/v1/models":
+            return httpx.Response(200, json={"data": [{"id": "shisa-ai/shisa-de-1"}]})
+        return httpx.Response(200, json=top_logprobs({"A": -0.5, "B": -1.5}))
+
+    with DecisionModel(readout=make_readout(handler)) as plain:
+        assert plain.strip_state_quotes is False
+        assert plain.health()["strip_state_quotes"] is False
+        assert plain.decide({"ticket": "late"}, {"route": Choice("Which queue?", {"billing": None, "logistics": None})},
+                            calibrated=False).meta["strip_state_quotes"] is False
+    with DecisionModel(readout=make_readout(handler, strip_state_quotes=True)) as stripped:
+        assert stripped.strip_state_quotes is True
+        assert stripped.health()["strip_state_quotes"] is True
 
 
 def test_every_letter_is_a_single_token_and_the_boundary_holds():
