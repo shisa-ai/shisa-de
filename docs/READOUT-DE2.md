@@ -19,6 +19,8 @@ adapter `de2-v4-lr5e5-e3-s7` on `google/gemma-4-26B-A4B-it` (snapshot
 attention backend, fingerprint `vllm-0.30.0-709530de`, on 2026-10-06. They
 describe that candidate on a local server, not the released
 `shisa-ai/shisa-de-2`; the calibration in section 7 is the exception.
+`shisa-ai/shisa-de-2.1` is read through this same contract; only its weights
+and its calibration record differ.
 Re-measure on the endpoint you deploy against.
 
 ## What changes from DE-1
@@ -31,7 +33,7 @@ Re-measure on the endpoint you deploy against.
 | Reading the codes | Top 20 logprobs, one fallback request per missing letter | Every code requested by token id ([section 3](#3-reading-the-codes)) |
 | Wide text choices | 27 to 676 through chunked finalist selection | 27 to 256 in one prompt; above 256 rejected |
 | Thinking | Never | When the first read is unsure ([section 4](#4-the-thinking-read)) |
-| Calibration | Bundled temperatures for `shisa-ai/shisa-de-1` | Bundled temperatures per read for `shisa-ai/shisa-de-2` ([section 7](#7-calibration)) |
+| Calibration | Bundled temperatures for `shisa-ai/shisa-de-1` | Bundled temperatures per read for `shisa-ai/shisa-de-2` and for `shisa-ai/shisa-de-2.1` ([section 7](#7-calibration)) |
 | Images | One direct read on the chat endpoint | The same ([section 6](#6-images)) |
 
 Up to 26 options the two contracts render the same one-pass prompt: the codes
@@ -383,8 +385,43 @@ Limits of this fit, also recorded in the record's `note`:
 - At 64 concurrent requests, 54 of the 529 questions below the gate read at or
   above it on a second pass and did not think.
 
-The record is applied on its own only to `shisa-ai/shisa-de-2`. Another DE-2
-checkpoint gets raw probabilities and a warning, as on DE-1. To calibrate one,
+### DE-2.1
+
+`shisa-ai/shisa-de-2.1` has its own record,
+`shisa_de/data/calibration-de2.1.json`, chosen when the model ID (or the
+tokenizer name) names it:
+
+| Read | `Answer.strategy` | noul | choice and score |
+| --- | --- | ---: | ---: |
+| `direct` | `direct` | 1.98 | 1.53 |
+| `repeat2` | `repeat2` | 2.11 | 1.64 |
+| `think` | `repeat2-think` | 5.23 | 5.23 |
+
+Measured on 2026-10-19 against the DE-2.1 release candidate's merged weights
+before upload, on a local vLLM 0.30.0 server (merged BF16, Triton attention
+chosen by default, one RTX PRO 6000, 64 concurrent requests), through this
+client with the same two scripts and no time cap: all 19,597 questions of 59
+suites read once and twice, 1,396 below the gate sent to the thinking read,
+1,298 thoughts. Same fit and split as above:
+
+| Read | Type | Test questions | Accuracy | Mean confidence, raw | ECE, raw | ECE, tempered |
+| --- | --- | ---: | ---: | ---: | ---: | ---: |
+| `direct` | noul | 3,612 | 92.1% | 96.9% | 0.048 | 0.019 |
+| `direct` | choice | 6,240 | 87.3% | 91.1% | 0.057 | 0.037 |
+| `repeat2` | noul | 3,612 | 93.6% | 97.1% | 0.040 | 0.023 |
+| `repeat2` | choice | 6,240 | 86.7% | 92.8% | 0.062 | 0.024 |
+| `think` | both | 1,298 | 62.1% | 93.7% | 0.320 | 0.086 |
+
+DE-2.1 is less overconfident than DE-2, and DE-2's temperatures over-correct
+it: on the same held-out half they leave ECE at 0.034 and 0.045 read once and
+0.048 and 0.042 read twice, the read-twice noul worse than raw. The research
+repository's comparison is `evals/reports/de21-rc-calibration-v1.json` there;
+it was not reproduced here. 936 of the 1,298 thoughts were cut by the budget.
+
+### Other checkpoints
+
+Each record is applied on its own only to the checkpoint it was fitted on.
+Another DE-2 checkpoint gets raw probabilities and a warning, as on DE-1. To calibrate one,
 fit on this readout and your serving shape with
 `scripts/calibrate_de2_collect.py` and `scripts/calibrate_de2_fit.py`, write a
 record whose `readout_version` is `de2-codebook-v1` with a `reads` table, and

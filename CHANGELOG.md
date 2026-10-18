@@ -1,5 +1,31 @@
 # Changelog
 
+## 0.6.0
+
+Support Shisa DE-2.1 and make it the default model. DE-2.1 is read through the
+DE-2 contract unchanged: the readout versions, the prompts, the requests and the
+policy are the same, and `de2-codebook-v1` still identifies the read. What is new
+is a calibration record per released checkpoint.
+
+- **Breaking:** `DEFAULT_MODEL` (and `--model`'s default) is now
+  `shisa-ai/shisa-de-2.1`. Pass `model="shisa-ai/shisa-de-2"` to keep reading
+  DE-2, which keeps its own record.
+- Bundle `shisa_de/data/calibration-de2.1.json`, temperatures per read for
+  `shisa-ai/shisa-de-2.1`: 1.98 / 1.53 read once, 2.11 / 1.64 read twice, 5.23
+  after thinking (noul / choice), against DE-2's 2.69 / 1.81, 2.76 / 1.89 and
+  6.8. Measured on 2026-10-19 on the release candidate's merged weights before
+  upload (local vLLM 0.30.0, merged BF16, Triton attention, one RTX PRO 6000),
+  19,597 questions from 59 suites. DE-2.1 is less overconfident than DE-2, and
+  DE-2's temperatures over-correct it; see `docs/READOUT-DE2.md` section 7.
+- Choose the bundled record by checkpoint: `CHECKPOINT_CALIBRATION_FILES` maps
+  `shisa-ai/shisa-de-1`, `shisa-ai/shisa-de-2` and `shisa-ai/shisa-de-2.1` to
+  their records, matched on the model id or, for an aliasing server, the
+  tokenizer name. Any other checkpoint gets its family's record, reported and
+  not applied, as before. `calibration_for(family, model=, tokenizer=)` takes
+  the served model, and `--calibration` also accepts a checkpoint id.
+- Validation: `python -m pytest tests/` (255 passed, 14 skipped). The live
+  suite was not run against DE-2.1.
+
 ## 0.5.1
 
 Add an opt-in state normalization for quote delimiters. The readout versions,

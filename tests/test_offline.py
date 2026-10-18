@@ -24,6 +24,7 @@ from shisa_de import Choice, DEFAULT_MODEL, DecisionModel, Noul, Readout, Readou
 from shisa_de import strip_quote_delimiters
 from shisa_de.calibration import (
     CALIBRATION_FILES,
+    CHECKPOINT_CALIBRATION_FILES,
     Calibration,
     calibration_for,
     confidence,
@@ -318,7 +319,7 @@ def test_hosted_defaults_and_api_key_precedence(monkeypatch, constructor, key_so
         assert str(request.url) == "https://api.shisa.ai/openai/v1/completions"
         assert request.headers["Authorization"] == f"Bearer {key_source}-key"
         assert json.loads(request.content)["model"] == expected_model
-        if expected_model == "shisa-ai/shisa-de-2":
+        if expected_model.startswith("shisa-ai/shisa-de-2"):
             return de2_server(request)
         return httpx.Response(200, json=top_logprobs({"A": -0.1, "B": -3.0}))
 
@@ -1208,6 +1209,7 @@ def test_calibration_is_applied_by_default_and_can_be_turned_off():
     ("de-1", "de1", True),
     ("de1-cont-v1-lr2e5-s7", "de1", True),
     ("shisa-ai/shisa-de-2", "de2", True),
+    ("shisa-ai/shisa-de-2.1", "de2", True),
     ("de2-v4-lr5e5-e3-s7", "de2", True),
     # No slug: DE-2 is assumed, and reported as an assumption.
     ("gemma-4-26b-a4b-it", "de2", False),
@@ -1300,6 +1302,43 @@ def test_the_de2_record_holds_one_fit_per_read_and_keeps_the_withheld_fit():
     de1 = calibration_for("de1")
     assert de1.fitted is True and not de1.reads
     assert de1.temperature_for("noul", "direct") == de1.temperature_for("noul") == de1.temperatures["noul"]
+
+
+def test_each_released_checkpoint_gets_its_own_record():
+    for model_id, name in CHECKPOINT_CALIBRATION_FILES.items():
+        record = load_calibration(name)
+        assert record.model.lower() == model_id, name
+        family = model_family(model_id)
+        assert calibration_for(family, model=model_id).model == record.model
+        level, reasons = record.applicability(model_id, READOUT_VERSIONS[family], family=family)
+        assert (level, reasons) == ("checkpoint", []), name
+    de21, de2 = calibration_for("de2", model="shisa-ai/shisa-de-2.1"), calibration_for("de2", model="shisa-ai/shisa-de-2")
+    assert de21.model == "shisa-ai/shisa-de-2.1" and de2.model == "shisa-ai/shisa-de-2"
+    assert set(de21.reads) == {"direct", "repeat2", "think"} and de21.reads != de2.reads
+    assert de21.temperatures == de21.reads["repeat2"] and de21.readout_version == DE2_READOUT_VERSION
+    # A server that aliases the id is recognised by its tokenizer source.
+    assert calibration_for("de2", model="alias", tokenizer="shisa-ai/shisa-de-2.1").model == "shisa-ai/shisa-de-2.1"
+    # A checkpoint of the other family does not lend its record.
+    assert calibration_for("de1", model="shisa-ai/shisa-de-2.1").family == "de1"
+    # Another DE-2 checkpoint gets the family record, which names DE-2 and is not applied to it.
+    assert calibration_for("de2", model="de2-some-arm").model == "shisa-ai/shisa-de-2"
+    assert resolve_calibration("shisa-ai/shisa-de-2.1").model == "shisa-ai/shisa-de-2.1"
+    assert resolve_calibration("DE-2").model == "shisa-ai/shisa-de-2"
+
+
+def test_the_client_applies_the_record_of_the_checkpoint_it_serves():
+    for model_id in ("shisa-ai/shisa-de-2", "shisa-ai/shisa-de-2.1"):
+        model = DecisionModel(base_url="http://test.local", model=model_id, api_key="",
+                              transport=httpx.MockTransport(StubDE2Server()))
+        assert model.calibration.model == model_id and model.calibration_applied
+        assert model.calibration_level == "checkpoint"
+        model.close()
+    with pytest.warns(UserWarning, match="not applied"):
+        arm = DecisionModel(base_url="http://test.local", model="de2-some-arm", api_key="",
+                            transport=httpx.MockTransport(StubDE2Server()))
+    assert not arm.calibration_applied and arm.calibration_level == "family"
+    arm.close()
+    assert DEFAULT_MODEL == "shisa-ai/shisa-de-2.1"
 
 
 def test_a_record_applies_to_its_checkpoint_and_says_why_otherwise():

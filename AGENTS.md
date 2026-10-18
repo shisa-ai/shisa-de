@@ -25,7 +25,9 @@ checkpoint through the other family's contract.
   (`READOUT_VERSIONS`, one current version per family, and
   `CALIBRATION_COMPATIBLE`) and the two readout pages.
 - A calibration record is applied on its own only to the checkpoint it was
-  fitted on, under a readout its fit still describes. The DE-2 record holds one
+  fitted on, under a readout its fit still describes. Released checkpoints map
+  to their records in `CHECKPOINT_CALIBRATION_FILES`; DE-2 and DE-2.1 share a
+  family and a contract but not a record. The DE-2 record holds one
   fit per read (`direct`, `repeat2`, `think`), each applied only to that read.
 - Every answer records its provenance (`family`, `readout_version`, `policy`,
   `strategy`, `calibration`, `temperature`, `calibrated`, `requests`) so a
@@ -79,6 +81,7 @@ What must not change casually:
 | `shisa_de/family.py` | Resolves DE-1/DE-2 from a declaration, the model id or the tokenizer, and says which |
 | `shisa_de/data/calibration.json` | Fitted DE-1 temperatures with their provenance |
 | `shisa_de/data/calibration-de2.json` | The DE-2 record: temperatures per read with the fit's provenance, and one withheld earlier fit |
+| `shisa_de/data/calibration-de2.1.json` | The DE-2.1 record: temperatures per read for `shisa-ai/shisa-de-2.1`, same contract as DE-2 |
 | `scripts/calibrate_de2_collect.py`, `calibrate_de2_fit.py` | Collect raw reads from a served DE-2 and fit the per-read temperatures |
 | `shisa_de/data/codebook-de2.json` | The 256 DE-2 answer codes, in order, with the audit they came from |
 | `shisa_de/cli.py` | `shisa-de doctor`, `ask`, `explain` |

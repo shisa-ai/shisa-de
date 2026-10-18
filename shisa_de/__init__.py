@@ -16,6 +16,7 @@ to declare it.
 
 from .calibration import (
     CALIBRATION_FILES,
+    CHECKPOINT_CALIBRATION_FILES,
     Calibration,
     calibration_for,
     calibration_from_dict,
@@ -57,11 +58,12 @@ from .readout import (
 )
 from .state import QUOTE_DELIMITERS, strip_quote_delimiters
 
-__version__ = "0.5.1"
+__version__ = "0.6.0"
 
 __all__ = [
     "Answer",
     "CALIBRATION_FILES",
+    "CHECKPOINT_CALIBRATION_FILES",
     "Calibration",
     "Choice",
     "DEFAULT_ENDPOINT",

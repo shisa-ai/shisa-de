@@ -1,0 +1,107 @@
+{
+ "temperatures": {
+  "noul": 2.11,
+  "choice": 1.64
+ },
+ "reads": {
+  "direct": {
+   "noul": 1.98,
+   "choice": 1.53
+  },
+  "repeat2": {
+   "noul": 2.11,
+   "choice": 1.64
+  },
+  "think": {
+   "noul": 5.23,
+   "choice": 5.23
+  }
+ },
+ "readout_version": "de2-codebook-v1",
+ "model": "shisa-ai/shisa-de-2.1",
+ "serving_shape": "vllm-0.30.0-merged-bf16-triton-tp1",
+ "family": "de2",
+ "fitted_on": "2026-10-19, the shisa-ai/shisa-de-2.1 release candidate before upload: the mean of eleven pool v11 LoRA updates (v11cr seeds 1-8, 10, 13, 42; adapter sha256 a03c54d9eb1a37e0...) merged into google/gemma-4-26B-A4B-it in bfloat16, with shisa-ai/shisa-de-2's config, chat templates and tokenizer, on a local vLLM 0.30.0 server: TRITON_ATTN (chosen by default), one RTX PRO 6000, max_model_len 262144, 64 concurrent requests, read through this client at de2-codebook-v1. 19,597 questions from 59 suites of research-jev-universal-classifiers evals/suites (reversed-order copies excluded), every question with no time cap. Each question was read once (`direct`) and twice (`repeat2`); the 1,396 below the 0.7 gate with at most 26 options were sent through the thinking read, and 1,298 thought. Fit: weighted NLL grid 0.5-32.0 step 0.01, every suite given equal weight, noul and choice separately, score distributions under the choice fit. `direct` and `repeat2` were fitted on one half of the groups and measured on the other. `think` is one temperature for both types fitted on all 1,298 rows (1,081 choice, 217 noul), measured by 5-fold cross-validation. `temperatures` repeats the `repeat2` entry; `reads` is what the client applies.",
+ "test_ece": {
+  "split": "held-out half of the groups; 5-fold cross-validation for think",
+  "direct_noul": {
+   "temperature": 1.98,
+   "fit_n": 3496,
+   "test_n": 3612,
+   "test_suites": 45,
+   "accuracy": 0.9214,
+   "confidence_before": 0.9689,
+   "confidence_after": 0.9274,
+   "ece_before": 0.0483,
+   "ece_after": 0.0192
+  },
+  "direct_choice": {
+   "temperature": 1.53,
+   "fit_n": 6249,
+   "test_n": 6240,
+   "test_suites": 41,
+   "accuracy": 0.873,
+   "confidence_before": 0.9109,
+   "confidence_after": 0.8587,
+   "ece_before": 0.0569,
+   "ece_after": 0.0368
+  },
+  "repeat2_noul": {
+   "temperature": 2.11,
+   "fit_n": 3496,
+   "test_n": 3612,
+   "test_suites": 45,
+   "accuracy": 0.9362,
+   "confidence_before": 0.9707,
+   "confidence_after": 0.9251,
+   "ece_before": 0.0404,
+   "ece_after": 0.0227
+  },
+  "repeat2_choice": {
+   "temperature": 1.64,
+   "fit_n": 6249,
+   "test_n": 6240,
+   "test_suites": 41,
+   "accuracy": 0.8673,
+   "confidence_before": 0.9284,
+   "confidence_after": 0.8694,
+   "ece_before": 0.0621,
+   "ece_after": 0.0237
+  },
+  "repeat2_above_gate_noul": {
+   "temperature": 2.11,
+   "fit_n": 3357,
+   "test_n": 3489,
+   "test_suites": 45,
+   "accuracy": 0.9431,
+   "confidence_before": 0.9819,
+   "confidence_after": 0.9365,
+   "ece_before": 0.0387,
+   "ece_after": 0.0185
+  },
+  "repeat2_above_gate_choice": {
+   "temperature": 1.63,
+   "fit_n": 5684,
+   "test_n": 5671,
+   "test_suites": 41,
+   "accuracy": 0.8967,
+   "confidence_before": 0.958,
+   "confidence_after": 0.8986,
+   "ece_before": 0.0625,
+   "ece_after": 0.0203
+  },
+  "think": {
+   "temperature": 5.23,
+   "n": 1298,
+   "suites": 47,
+   "accuracy": 0.6214,
+   "confidence_before": 0.9369,
+   "confidence_after": 0.6339,
+   "ece_before": 0.3196,
+   "ece_after": 0.0862,
+   "thoughts_cut_by_the_budget": 936
+  }
+ },
+ "source": "scripts/calibrate_de2_collect.py (time cap removed for this run) and scripts/calibrate_de2_fit.py in this repository; rows and the fit report kept outside it at /data/de2/calibration-avg-v11cr-n11-20261019 (reads.jsonl sha256 6a601dbd3f94d4d7..., thoughts.jsonl sha256 d40720030663b937...); comparison with the DE-2 record in research-jev-universal-classifiers evals/reports/de21-rc-calibration-v1.json",
+ "note": "Fitted on the release candidate's merged weights before upload; the published checkpoint is expected to be these weights. DE-2's temperatures over-correct this checkpoint (read-twice noul ECE 0.048 on the same held-out half, against 0.040 raw and 0.023 with this fit). Known limits: the suites are evaluation suites whose overlap with the training pool was not checked; no image questions; one serving shape; 936 of the 1,298 thoughts were cut by the 1,024-token budget, and the think fit still leaves a cross-validated ECE of 0.086. The gate reads raw probabilities and is unaffected. Re-fit before relying on these numbers for a threshold on another serving shape."
+}

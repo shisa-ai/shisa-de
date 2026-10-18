@@ -41,7 +41,7 @@ from .policy import THINK_OPTION_CAP, PolicyRead, ReadOptions, read_policy, reso
 from .readout import MAX_CODES, READOUT_VERSIONS, LetterRead, Readout, ReadoutError, codes_for
 
 DEFAULT_ENDPOINT = "https://api.shisa.ai/openai"
-DEFAULT_MODEL = "shisa-ai/shisa-de-2"
+DEFAULT_MODEL = "shisa-ai/shisa-de-2.1"
 ENDPOINT_ENV = "SHISA_DE_ENDPOINT"
 API_KEY_ENVS = ("SHISA_DE_API_KEY", "SHISA_API_KEY")
 
@@ -353,7 +353,8 @@ class DecisionModel:
         # fitted on. A record the caller passes is their assertion and is applied
         # as given; `health` still reports how far it matches.
         supplied = calibration is not None
-        self.calibration = calibration if supplied else calibration_for(self.family)
+        self.calibration = calibration if supplied else calibration_for(
+            self.family, model=self.model, tokenizer=tokenizer_source)
         self.calibration_level, self.calibration_reasons = self.calibration.applicability(
             self.model, self.readout_version, family=self.family, tokenizer=tokenizer_source)
         self.calibration_applied = self.calibration.fitted and (

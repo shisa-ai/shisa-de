@@ -15,7 +15,7 @@ import json
 import shlex
 from typing import Any
 
-from .calibration import CALIBRATION_FILES, resolve_calibration
+from .calibration import CALIBRATION_FILES, CHECKPOINT_CALIBRATION_FILES, resolve_calibration
 from .client import DEFAULT_ENDPOINT, DEFAULT_MODEL, DecisionModel, _api_key_from_env
 from .family import FAMILIES
 from .policy import POLICIES, READS, THINK_BUDGET, THINK_GATE
@@ -53,6 +53,7 @@ def _common(parser: argparse.ArgumentParser) -> None:
     parser.add_argument(
         "--calibration", default=None, metavar="SPEC",
         help=("calibration record: a family (" + ", ".join(sorted(CALIBRATION_FILES))
+              + "), a released checkpoint id (" + ", ".join(CHECKPOINT_CALIBRATION_FILES)
               + ") or a path to a record. Default: chosen from the served model id"),
     )
     parser.add_argument("--family", default=None, choices=FAMILIES,

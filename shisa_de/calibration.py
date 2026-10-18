@@ -9,8 +9,11 @@ Two numbers are kept apart on purpose:
   near-calibrated and temperature scaling sharpens it further; the temperatures
   shipped here were fitted on dev splits of the committed suites.
 
-One record ships per family, because a temperature fitted on one checkpoint
-provides no evidence about another. Every answer says which calibration was
+One record ships per released checkpoint, because a temperature fitted on one
+checkpoint provides no evidence about another. A served model whose id (or
+tokenizer source) names a released checkpoint gets that checkpoint's record;
+any other model gets its family's record, which is reported but not applied.
+Every answer says which calibration was
 applied, including the model it was fitted on, because a threshold fitted
 against one readout, one serving shape, or one checkpoint does not transfer to
 another.
@@ -34,9 +37,17 @@ from .readout import calibration_compatible
 
 CALIBRATION_FILE = "data/calibration.json"
 
-#: One record per family. A temperature fitted on one checkpoint does not
-#: transfer to another, so the record a caller gets has to match the model.
+#: One record per family, for a model that names no released checkpoint. A
+#: temperature fitted on one checkpoint does not transfer to another, so this
+#: record is reported for such a model but not applied.
 CALIBRATION_FILES = {"de1": CALIBRATION_FILE, "de2": "data/calibration-de2.json"}
+
+#: One record per released checkpoint, keyed by its model id (lower case).
+CHECKPOINT_CALIBRATION_FILES = {
+    "shisa-ai/shisa-de-1": CALIBRATION_FILE,
+    "shisa-ai/shisa-de-2": "data/calibration-de2.json",
+    "shisa-ai/shisa-de-2.1": "data/calibration-de2.1.json",
+}
 
 
 def temper_binary(p: float, temperature: float) -> float:
@@ -209,19 +220,34 @@ def calibration_from_dict(raw: dict[str, Any], origin: str = "") -> Calibration:
     )
 
 
-def calibration_for(family: str) -> Calibration:
-    """The shipped record for a family."""
-    return load_calibration(CALIBRATION_FILES[normalize_family(family)])
+def calibration_for(family: str, model: str | None = None, tokenizer: str | None = None) -> Calibration:
+    """The shipped record for a served model.
+
+    The record of the released checkpoint that `model`, or else `tokenizer`, names,
+    when that checkpoint is of `family`; otherwise the family's record.
+    """
+    family = normalize_family(family)
+    for name in (model, tokenizer):
+        path = CHECKPOINT_CALIBRATION_FILES.get(str(name or "").lower())
+        if path:
+            record = load_calibration(path)
+            if record.family == family:
+                return record
+    return load_calibration(CALIBRATION_FILES[family])
 
 
 def resolve_calibration(spec: str | None) -> Calibration | None:
     """Resolve a `--calibration` argument.
 
-    Accepts a family name in any common spelling (`de1`, `DE-2`) or a path to a
-    record. `None` or `"auto"` means "let the client pick from the served model".
+    Accepts a family name in any common spelling (`de1`, `DE-2`), a released
+    checkpoint id (`shisa-ai/shisa-de-2.1`) or a path to a record. `None` or
+    `"auto"` means "let the client pick from the served model".
     """
     if spec is None or spec == "auto":
         return None
+    path = CHECKPOINT_CALIBRATION_FILES.get(spec.lower())
+    if path:
+        return load_calibration(path)
     try:
         return calibration_for(spec)
     except ValueError:
@@ -230,12 +256,14 @@ def resolve_calibration(spec: str | None) -> Calibration | None:
         return load_calibration_file(spec)
     except FileNotFoundError as exc:
         raise ValueError(
-            f"--calibration {spec!r} is neither a family ({', '.join(FAMILIES)}) nor a record file"
+            f"--calibration {spec!r} is neither a family ({', '.join(FAMILIES)}), a released checkpoint "
+            f"({', '.join(CHECKPOINT_CALIBRATION_FILES)}) nor a record file"
         ) from exc
 
 
 __all__ = [
     "CALIBRATION_FILES",
+    "CHECKPOINT_CALIBRATION_FILES",
     "Calibration",
     "calibration_for",
     "calibration_from_dict",

@@ -1,16 +1,19 @@
 # shisa-de
 
-A Python client for [Shisa DE-1](https://huggingface.co/shisa-ai/shisa-de-1) and
-DE-2, models for classification and typed decisions.
+A Python client for [Shisa DE-1](https://huggingface.co/shisa-ai/shisa-de-1),
+DE-2 and DE-2.1, models for classification and typed decisions.
 
 Give it text, images, or structured data and a set of labels or questions. It
 returns answers, probabilities, and request usage, not generated prose. The
 client loads only a tokenizer; model weights stay on the server.
 
 - **DE-1** is available from your own OpenAI-compatible server.
-- **DE-2** is the default on [Shisa API](https://platform.shisa.ai/) and is also
-  available as [`shisa-ai/shisa-de-2`](https://huggingface.co/shisa-ai/shisa-de-2)
-  from your own OpenAI-compatible server; see [Use DE-2](#use-de-2).
+- **DE-2** is available on [Shisa API](https://platform.shisa.ai/) and as
+  [`shisa-ai/shisa-de-2`](https://huggingface.co/shisa-ai/shisa-de-2) from your
+  own OpenAI-compatible server; see [Use DE-2](#use-de-2).
+- **DE-2.1** ([`shisa-ai/shisa-de-2.1`](https://huggingface.co/shisa-ai/shisa-de-2.1))
+  is DE-2 with new weights: the same prompt, readout and policy, its own
+  calibration. It is the client's default model from 0.6.0.
 
 ## Benchmark snapshot
 
@@ -53,7 +56,8 @@ with DecisionModel() as de:
     print(result["intent"])  # spam
 ```
 
-The defaults are model `shisa-ai/shisa-de-2` at `https://api.shisa.ai/openai`.
+The defaults are model `shisa-ai/shisa-de-2.1` at `https://api.shisa.ai/openai`;
+pass `model=` (or `--model`) for the id your endpoint serves.
 The tokenizer is downloaded from Hugging Face on the first call, not at import.
 The client needs neither PyTorch nor a GPU.
 
@@ -225,8 +229,10 @@ calibrated in `answer.calibrated` and `answer.temperature`.
 | DE-1 large label sets | Finalist scores, never calibrated |
 
 Each bundled calibration is applied only to the model it was fitted on:
-`shisa-ai/shisa-de-1` and `shisa-ai/shisa-de-2`. Any other checkpoint gets raw
-probabilities and a warning. The DE-2 fit is a first, rough one; probabilities
+`shisa-ai/shisa-de-1`, `shisa-ai/shisa-de-2` and `shisa-ai/shisa-de-2.1`, picked
+by the model ID (or, for a server that aliases it, the tokenizer name). Any other
+checkpoint gets raw probabilities and a warning. The DE-2 and DE-2.1 temperatures
+differ: DE-2.1 is less overconfident, and DE-2's fit over-corrects it. Probabilities
 read after a thinking step are the least reliable
 ([details](docs/READOUT-DE2.md#7-calibration)). To use a calibration you fitted yourself, or to
 vouch for the bundled one on another checkpoint, pass it in:
@@ -315,7 +321,7 @@ shisa-de ask --state 'Please refund my duplicate payment.' --labels refund_reque
 | --- | --- |
 | Endpoint | `base_url=` / `--base-url`, then `SHISA_DE_ENDPOINT`, then the hosted default |
 | API key | `api_key=`, then `SHISA_DE_API_KEY`, then `SHISA_API_KEY` |
-| Model | `model=` / `--model`, otherwise `shisa-ai/shisa-de-2` |
+| Model | `model=` / `--model`, otherwise `shisa-ai/shisa-de-2.1` |
 | Tokenizer | `tokenizer=` / `--tokenizer`, otherwise the model ID |
 | Model family | `family=` / `--family`, then `de-1` or `de-2` in the model ID, then in the tokenizer name, otherwise DE-2 with a warning |
 
@@ -324,9 +330,10 @@ environment are sent to local endpoints too.
 
 ## Use DE-2
 
-The same `classify` and `decide` calls work against DE-2. On Shisa API, it is the
-default model; you can also serve it yourself with
-`vllm serve shisa-ai/shisa-de-2` and point the client at it.
+The same `classify` and `decide` calls work against DE-2 and DE-2.1, which share
+one contract. DE-2 is on Shisa API; you can also serve either yourself with
+`vllm serve shisa-ai/shisa-de-2.1` (or `shisa-ai/shisa-de-2`) and point the client
+at it.
 The client asks DE-2 differently from DE-1, the way DE-2 was built to be asked:
 
 - **Each question is shown to the model twice** in one prompt.
@@ -335,16 +342,17 @@ The client asks DE-2 differently from DE-1, the way DE-2 was built to be asked:
   tokens and then answers again.
 - **Text choices go up to 256 options** in one question, with a full probability
   distribution and a confidence.
-- **Probabilities are calibrated per read** on `shisa-ai/shisa-de-2`: answers
-  read once, twice, and after thinking each get their own fit. Other DE-2
-  checkpoints get raw probabilities.
+- **Probabilities are calibrated per read** on `shisa-ai/shisa-de-2` and
+  `shisa-ai/shisa-de-2.1`, each with its own record: answers read once, twice,
+  and after thinking each get their own fit. Other DE-2 checkpoints get raw
+  probabilities.
 
 ```python
 from shisa_de import Choice, DecisionModel
 
 with DecisionModel.from_endpoint(
     "http://127.0.0.1:8000/v1",
-    model="shisa-ai/shisa-de-2",
+    model="shisa-ai/shisa-de-2.1",
     api_key="",
 ) as de:
     result = de.decide("Route this support request", {
@@ -359,7 +367,7 @@ with DecisionModel.from_endpoint(
 ```
 
 ```bash
-shisa-de doctor --base-url http://127.0.0.1:8000/v1 --model shisa-ai/shisa-de-2 --probe
+shisa-de doctor --base-url http://127.0.0.1:8000/v1 --model shisa-ai/shisa-de-2.1 --probe
 ```
 
 For your own DE-2 checkpoint under another name, pass `model=` as your server
