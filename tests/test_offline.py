@@ -17,6 +17,8 @@ from contextlib import ExitStack
 from threading import Event, Lock
 from types import SimpleNamespace
 
+import contextlib
+
 import httpx
 import pytest
 
@@ -29,6 +31,7 @@ from shisa_de.calibration import (
     calibration_for,
     confidence,
     load_calibration,
+    released_checkpoint,
     resolve_calibration,
     temper_binary,
     temper_distribution,
@@ -1324,6 +1327,34 @@ def test_each_released_checkpoint_gets_its_own_record():
     assert calibration_for("de2", model="de2-some-arm").model == "shisa-ai/shisa-de-2"
     assert resolve_calibration("shisa-ai/shisa-de-2.1").model == "shisa-ai/shisa-de-2.1"
     assert resolve_calibration("DE-2").model == "shisa-ai/shisa-de-2"
+
+
+@pytest.mark.parametrize("name,checkpoint", [
+    ("shisa-ai/shisa-de-2.1", "shisa-ai/shisa-de-2.1"),
+    ("shisa-ai/shisa-de-2.1-FP8-dynamic", "shisa-ai/shisa-de-2.1"),
+    ("/models/shisa-de-2.1", "shisa-ai/shisa-de-2.1"),
+    ("shisa-de-2.1", "shisa-ai/shisa-de-2.1"),
+    ("shisa-ai/shisa-de-2", "shisa-ai/shisa-de-2"),
+    ("shisa-ai/shisa-de-2-FP8-dynamic", "shisa-ai/shisa-de-2"),
+    ("shisa-ai/shisa-de-1-FP8-dynamic", "shisa-ai/shisa-de-1"),
+    # Not a released checkpoint: training arms, other versions, look-alikes.
+    ("de2-v4-lr5e5-e3-s7", None),
+    ("de2-some-arm", None),
+    ("shisa-ai/shisa-de-2.2", None),
+    ("shisa-ai/shisa-de-21", None),
+    ("shisa-ai/shisa-de-2.10", None),
+    ("my-shisa-de-2.1x", None),
+])
+def test_a_released_checkpoint_is_recognised_by_its_name(name, checkpoint):
+    assert released_checkpoint(name) == checkpoint
+
+
+def test_a_quantized_repo_gets_its_original_checkpoints_record():
+    model = DecisionModel(base_url="http://test.local", model="shisa-ai/shisa-de-2.1-FP8-dynamic", api_key="",
+                          transport=httpx.MockTransport(StubDE2Server()))
+    assert model.calibration.model == "shisa-ai/shisa-de-2.1"
+    assert model.calibration_level == "checkpoint" and model.calibration_applied
+    model.close()
 
 
 def test_the_client_applies_the_record_of_the_checkpoint_it_serves():

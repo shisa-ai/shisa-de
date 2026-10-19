@@ -1,5 +1,19 @@
 # Changelog
 
+## 0.6.1
+
+Recognise a released checkpoint by its name, not only by its exact id. The readout
+versions, prompts, requests and bundled records are unchanged.
+
+- A model id or tokenizer name that contains `shisa-de-1`, `shisa-de-2` or
+  `shisa-de-2.1` as its own token gets that checkpoint's calibration record:
+  `shisa-ai/shisa-de-2.1-FP8-dynamic`, `shisa-ai/shisa-de-2-FP8-dynamic` and local
+  directories named after a release no longer need `tokenizer=` to be calibrated.
+  `shisa-de-2.1` is never read as `shisa-de-2`, and training-arm names such as
+  `de2-v4-lr5e5-e3-s7` still get raw probabilities.
+- Export `released_checkpoint`, the name match the client uses.
+- Validation: `python -m pytest tests/` (269 passed, 14 skipped).
+
 ## 0.6.0
 
 Support Shisa DE-2.1. DE-2.1 is read through the

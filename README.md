@@ -230,8 +230,10 @@ calibrated in `answer.calibrated` and `answer.temperature`.
 
 Each bundled calibration is applied only to the model it was fitted on:
 `shisa-ai/shisa-de-1`, `shisa-ai/shisa-de-2` and `shisa-ai/shisa-de-2.1`, picked
-by the model ID (or, for a server that aliases it, the tokenizer name). Any other
-checkpoint gets raw probabilities and a warning. The DE-2 and DE-2.1 temperatures
+by the model ID (or, for a server that aliases it, the tokenizer name). A name that
+contains a released checkpoint's name, such as `shisa-ai/shisa-de-2.1-FP8-dynamic` or a
+local `shisa-de-2.1` directory, gets that checkpoint's record. Any other checkpoint gets
+raw probabilities and a warning. The DE-2 and DE-2.1 temperatures
 differ: DE-2.1 is less overconfident, and DE-2's fit over-corrects it. Probabilities
 read after a thinking step are the least reliable
 ([details](docs/READOUT-DE2.md#7-calibration)). To use a calibration you fitted yourself, or to

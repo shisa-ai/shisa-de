@@ -27,6 +27,7 @@ and the read after a thought are differently overconfident.
 from __future__ import annotations
 
 import json
+import re
 from dataclasses import dataclass, field
 from importlib import resources
 from pathlib import Path
@@ -48,6 +49,24 @@ CHECKPOINT_CALIBRATION_FILES = {
     "shisa-ai/shisa-de-2": "data/calibration-de2.json",
     "shisa-ai/shisa-de-2.1": "data/calibration-de2.1.json",
 }
+
+
+def released_checkpoint(name: str | None) -> str | None:
+    """The released checkpoint a model id or tokenizer name refers to, or `None`.
+
+    An exact id, or a name that contains a released checkpoint's name as its
+    own token: `shisa-ai/shisa-de-2.1-FP8-dynamic` or a local `shisa-de-2.1`
+    is DE-2.1, and `shisa-de-2.1` is never read as `shisa-de-2`. A training
+    arm such as `de2-v4-lr5e5-e3-s7` names no released checkpoint.
+    """
+    text = str(name or "").lower()
+    if text in CHECKPOINT_CALIBRATION_FILES:
+        return text
+    for checkpoint in sorted(CHECKPOINT_CALIBRATION_FILES, key=len, reverse=True):
+        slug = re.escape(checkpoint.split("/", 1)[1])
+        if re.search(rf"(?<![a-z0-9.]){slug}(?![a-z0-9.])", text):
+            return checkpoint
+    return None
 
 
 def temper_binary(p: float, temperature: float) -> float:
@@ -174,7 +193,7 @@ class Calibration:
             return "mismatch", reasons
         if not self.fitted:
             return "unfitted", []
-        names = {str(name).lower() for name in (model, tokenizer) if name}
+        names = {released_checkpoint(name) or str(name).lower() for name in (model, tokenizer) if name}
         if self.model.lower() in names:
             return "checkpoint", []
         return "family", [f"fitted on {self.model!r}, not on {model!r}: same family, another checkpoint"]
@@ -228,7 +247,7 @@ def calibration_for(family: str, model: str | None = None, tokenizer: str | None
     """
     family = normalize_family(family)
     for name in (model, tokenizer):
-        path = CHECKPOINT_CALIBRATION_FILES.get(str(name or "").lower())
+        path = CHECKPOINT_CALIBRATION_FILES.get(released_checkpoint(name) or "")
         if path:
             record = load_calibration(path)
             if record.family == family:
@@ -245,7 +264,7 @@ def resolve_calibration(spec: str | None) -> Calibration | None:
     """
     if spec is None or spec == "auto":
         return None
-    path = CHECKPOINT_CALIBRATION_FILES.get(spec.lower())
+    path = CHECKPOINT_CALIBRATION_FILES.get(released_checkpoint(spec) or "")
     if path:
         return load_calibration(path)
     try:
@@ -265,6 +284,7 @@ __all__ = [
     "CALIBRATION_FILES",
     "CHECKPOINT_CALIBRATION_FILES",
     "Calibration",
+    "released_checkpoint",
     "calibration_for",
     "calibration_from_dict",
     "confidence",

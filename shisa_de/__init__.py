@@ -23,6 +23,7 @@ from .calibration import (
     confidence,
     load_calibration,
     load_calibration_file,
+    released_checkpoint,
     resolve_calibration,
     temper_binary,
     temper_distribution,
@@ -58,7 +59,7 @@ from .readout import (
 )
 from .state import QUOTE_DELIMITERS, strip_quote_delimiters
 
-__version__ = "0.6.0"
+__version__ = "0.6.1"
 
 __all__ = [
     "Answer",
@@ -108,6 +109,7 @@ __all__ = [
     "read_policy",
     "resolve_family",
     "resolve_options",
+    "released_checkpoint",
     "resolve_calibration",
     "softmax",
     "strip_quote_delimiters",
