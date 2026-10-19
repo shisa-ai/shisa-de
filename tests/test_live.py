@@ -187,4 +187,6 @@ def test_de2_thinks_when_the_repeated_read_is_unsure(model):
     assert 0 < answer.thought_tokens <= eager.think_budget and answer.thought_closed is not None
     assert result["sum"] == "b"
     assert result.usage["thought_tokens"] == answer.thought_tokens
-    assert answer.calibrated is False
+    # The DE-2 and DE-2.1 records carry a `think` entry; an answer after a thought takes it when the record applies.
+    expected = eager.calibration.temperature_for("choice", "think") if eager.calibration_applied else 1.0
+    assert answer.calibrated is (expected != 1.0) and answer.temperature == expected
