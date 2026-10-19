@@ -1338,7 +1338,7 @@ def test_the_client_applies_the_record_of_the_checkpoint_it_serves():
                             transport=httpx.MockTransport(StubDE2Server()))
     assert not arm.calibration_applied and arm.calibration_level == "family"
     arm.close()
-    assert DEFAULT_MODEL == "shisa-ai/shisa-de-2.1"
+    assert DEFAULT_MODEL == "shisa-ai/shisa-de-2"
 
 
 def test_a_record_applies_to_its_checkpoint_and_says_why_otherwise():

@@ -41,7 +41,7 @@ from .policy import THINK_OPTION_CAP, PolicyRead, ReadOptions, read_policy, reso
 from .readout import MAX_CODES, READOUT_VERSIONS, LetterRead, Readout, ReadoutError, codes_for
 
 DEFAULT_ENDPOINT = "https://api.shisa.ai/openai"
-DEFAULT_MODEL = "shisa-ai/shisa-de-2.1"
+DEFAULT_MODEL = "shisa-ai/shisa-de-2"
 ENDPOINT_ENV = "SHISA_DE_ENDPOINT"
 API_KEY_ENVS = ("SHISA_DE_API_KEY", "SHISA_API_KEY")
 

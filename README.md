@@ -13,7 +13,7 @@ client loads only a tokenizer; model weights stay on the server.
   own OpenAI-compatible server; see [Use DE-2](#use-de-2).
 - **DE-2.1** ([`shisa-ai/shisa-de-2.1`](https://huggingface.co/shisa-ai/shisa-de-2.1))
   is DE-2 with new weights: the same prompt, readout and policy, its own
-  calibration. It is the client's default model from 0.6.0.
+  calibration. Pass `model="shisa-ai/shisa-de-2.1"` to use it.
 
 ## Benchmark snapshot
 
@@ -56,7 +56,7 @@ with DecisionModel() as de:
     print(result["intent"])  # spam
 ```
 
-The defaults are model `shisa-ai/shisa-de-2.1` at `https://api.shisa.ai/openai`;
+The defaults are model `shisa-ai/shisa-de-2` at `https://api.shisa.ai/openai`;
 pass `model=` (or `--model`) for the id your endpoint serves.
 The tokenizer is downloaded from Hugging Face on the first call, not at import.
 The client needs neither PyTorch nor a GPU.
@@ -321,7 +321,7 @@ shisa-de ask --state 'Please refund my duplicate payment.' --labels refund_reque
 | --- | --- |
 | Endpoint | `base_url=` / `--base-url`, then `SHISA_DE_ENDPOINT`, then the hosted default |
 | API key | `api_key=`, then `SHISA_DE_API_KEY`, then `SHISA_API_KEY` |
-| Model | `model=` / `--model`, otherwise `shisa-ai/shisa-de-2.1` |
+| Model | `model=` / `--model`, otherwise `shisa-ai/shisa-de-2` |
 | Tokenizer | `tokenizer=` / `--tokenizer`, otherwise the model ID |
 | Model family | `family=` / `--family`, then `de-1` or `de-2` in the model ID, then in the tokenizer name, otherwise DE-2 with a warning |
 
